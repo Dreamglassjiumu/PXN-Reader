@@ -24,7 +24,15 @@ jobs:
           python-version: '3.11'
 
       - name: Download requirements for offline install
-        run: python -m pip download -r requirements.txt -d offline_wheels
+        run: python -m pip download -r requirements.txt -d offline_wheels --only-binary=:all:
+
+      - name: Verify numpy wheel is included
+        shell: pwsh
+        run: |
+          dir offline_wheels
+          if (-not (Get-ChildItem -Path offline_wheels -Filter "numpy*.whl")) {
+            Write-Error "numpy wheel was not downloaded into offline_wheels"
+          }
 
       - name: Upload offline package
         uses: actions/upload-artifact@v4
