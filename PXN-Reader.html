@@ -457,43 +457,65 @@
     .word-preview {
       max-height: 620px;
       overflow: auto;
-      padding: 22px;
+      padding: 24px;
       border: 1px solid rgba(185, 148, 77, 0.46);
       border-radius: 16px;
-      background:
-        radial-gradient(circle at 18% 0, rgba(209, 177, 112, 0.08), transparent 16rem),
-        linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.32)),
-        rgba(10, 11, 12, 0.72);
-      box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.20);
-      color: #efe6d0;
-      font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
-      line-height: 1.75;
+      background: #f8f4ea;
+      box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.12);
+      color: #2b2520;
+      font-family: "Microsoft YaHei", "微软雅黑", SimSun, serif;
+      line-height: 1.7;
+    }
+
+    .word-preview .word-document {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 18px 22px;
+      background: #fffdf7;
+      border: 1px solid #d9cda8;
+    }
+
+    .word-preview h1,
+    .word-preview h2,
+    .word-preview h3,
+    .word-preview h4,
+    .word-preview h5,
+    .word-preview h6 {
+      color: #2d241b;
+      page-break-after: avoid;
     }
 
     .word-preview h1 {
       display: block;
-      margin: 0 0 14px;
-      padding: 0 0 8px;
-      border-bottom: 1px solid rgba(209, 177, 112, 0.38);
-      font-size: 24px;
+      margin: 0 0 18px;
+      padding: 0 0 10px;
+      border-bottom: 2px solid #b9944d;
+      font-size: 28px;
       letter-spacing: 0.02em;
     }
 
     .word-preview h1::after { content: none; }
-    .word-preview h2 { margin: 18px 0 10px; color: #f2dfb2; font-size: 20px; }
-    .word-preview h3 { margin: 14px 0 8px; color: #d8ba74; font-size: 17px; }
-    .word-preview h4 { margin: 12px 0 7px; color: #d2ab63; font-size: 15px; }
-    .word-preview h5, .word-preview h6 { margin: 10px 0 6px; color: #caa35e; font-size: 14px; }
-    .word-preview p { margin: 8px 0; }
-    .word-preview blockquote { margin: 12px 0; padding: 8px 12px; border-left: 4px solid var(--brass); background: rgba(185, 148, 77, 0.10); color: var(--ink-soft); }
-    .word-preview pre { overflow: auto; padding: 12px; border: 1px solid rgba(185, 148, 77, 0.34); border-radius: 10px; background: rgba(0, 0, 0, 0.38); }
-    .word-preview code { font-family: Consolas, "Microsoft YaHei", monospace; }
-    .word-preview hr { border: 0; border-top: 1px solid rgba(209, 177, 112, 0.55); margin: 18px 0; }
-    .word-preview .word-table-block { overflow-x: auto; margin: 12px 0 18px; }
-    .word-preview .word-table { min-width: 0; width: 100%; border: 1px solid rgba(185, 148, 77, 0.36); }
-    .word-preview .word-table th, .word-preview .word-table td { border: 1px solid rgba(185, 148, 77, 0.24); padding: 8px; }
-    .word-preview .word-list-item .list-marker { color: #f2dfb2; font-weight: 700; }
-    .word-preview .category { color: var(--muted); font-size: 12px; }
+    .word-preview h2 { margin: 24px 0 12px; padding-bottom: 7px; border-bottom: 1px solid #d1b170; font-size: 22px; }
+    .word-preview h3 { margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #ded4b6; font-size: 18px; }
+    .word-preview h4 { margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #eadfc4; font-size: 16px; }
+    .word-preview h5, .word-preview h6 { margin: 14px 0 7px; font-size: 15px; }
+    .word-preview p { margin: 9px 0 12px; }
+    .word-preview blockquote { margin: 12px 0 16px; padding: 8px 12px; border-left: 4px solid #b9944d; background: #f7f0df; color: #4b4034; }
+    .word-preview pre { overflow: auto; padding: 12px; border: 1px solid #c9c0aa; border-radius: 6px; background: #f3f3f3; color: #222; white-space: pre-wrap; word-break: break-word; }
+    .word-preview code, .word-preview .inline-code { padding: 1px 4px; border-radius: 3px; background: #eeeeee; color: #333; font-family: Consolas, "Courier New", "Microsoft YaHei", monospace; }
+    .word-preview hr { border: 0; border-top: 1px solid #d1b170; margin: 18px 0; }
+    .word-preview .word-info { margin: 0 0 18px; padding: 10px 12px; border: 1px solid #d9cda8; background: #faf6e8; color: #5e513f; font-size: 13px; }
+    .word-preview .word-info p { margin: 3px 0; }
+    .word-preview .word-table-block { overflow-x: auto; margin: 12px 0 20px; }
+    .word-preview .word-table { min-width: 0; width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #999; color: #222; }
+    .word-preview .word-table th, .word-preview .word-table td { border: 1px solid #999; padding: 6px 8px; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
+    .word-preview .word-table th { background: #eee6d1; font-weight: 700; text-align: left; }
+    .word-preview .word-list-item .list-marker { color: #6f5124; font-weight: 700; }
+    .word-preview .table-field-block { margin: 12px 0 16px; padding: 10px 12px; border: 1px solid #c9b889; background: #fffaf0; page-break-inside: avoid; }
+    .word-preview .table-field-title { margin: 0 0 8px; color: #4b3518; font-weight: 700; }
+    .word-preview .table-field-line { margin: 5px 0; }
+    .word-preview .table-field-label { display: inline-block; min-width: 92px; color: #6f5124; font-weight: 700; }
+    .word-preview .category { color: #777; font-size: 12px; }
 
     @media (max-width: 720px) {
       .recommend-panel { grid-template-columns: 1fr; }
@@ -1210,8 +1232,36 @@
         setStatus('Excel 已导出。');
       }
 
+      const WORD_EXPORT_CSS = [
+        'body{margin:0;background:#f4f0e6;color:#222;font-family:"Microsoft YaHei",SimSun,serif;line-height:1.7;font-size:14px;}',
+        '.word-document{max-width:960px;margin:0 auto;padding:24px 30px;background:#fff;}',
+        'h1,h2,h3,h4,h5,h6{color:#241d17;page-break-after:avoid;}',
+        'h1{font-size:28px;margin:0 0 18px;padding:0 0 10px;border-bottom:2px solid #b9944d;}',
+        'h2{font-size:22px;margin:24px 0 12px;padding-bottom:7px;border-bottom:1px solid #d1b170;}',
+        'h3{font-size:18px;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #ded4b6;}',
+        'h4{font-size:16px;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid #eadfc4;}',
+        'h5,h6{font-size:15px;margin:14px 0 7px;}',
+        'p{margin:9px 0 12px;}',
+        'blockquote{margin:12px 0 16px;padding:8px 12px;border-left:4px solid #b9944d;background:#f7f0df;color:#4b4034;}',
+        'pre{padding:12px;border:1px solid #c9c0aa;background:#f3f3f3;white-space:pre-wrap;word-break:break-word;}',
+        'code,.inline-code{padding:1px 4px;background:#eeeeee;color:#333;font-family:Consolas,"Courier New","Microsoft YaHei",monospace;}',
+        'hr{border:0;border-top:1px solid #d1b170;margin:18px 0;}',
+        '.word-info{margin:0 0 18px;padding:10px 12px;border:1px solid #d9cda8;background:#faf6e8;color:#5e513f;font-size:13px;}',
+        '.word-info p{margin:3px 0;}',
+        '.word-table-block{margin:12px 0 20px;}',
+        'table.word-table{border-collapse:collapse;width:100%;table-layout:fixed;border:1px solid #999;}',
+        '.word-table th,.word-table td{border:1px solid #999;padding:6px 8px;vertical-align:top;word-break:break-word;overflow-wrap:anywhere;}',
+        '.word-table th{background:#eee6d1;font-weight:bold;text-align:left;}',
+        '.word-list-item .list-marker{color:#6f5124;font-weight:bold;}',
+        '.table-field-block{margin:12px 0 16px;padding:10px 12px;border:1px solid #c9b889;background:#fffaf0;page-break-inside:avoid;}',
+        '.table-field-title{margin:0 0 8px;color:#4b3518;font-weight:bold;}',
+        '.table-field-line{margin:5px 0;}',
+        '.table-field-label{display:inline-block;min-width:92px;color:#6f5124;font-weight:bold;}',
+        '.category{color:#777;font-size:12px;}'
+      ].join('');
+
       function buildWordSectionsHtml() {
-        const sections = [];
+        const sections = [buildWordInfoBlock()];
         for (let index = 0; index < rows.length; index += 1) {
           const row = rows[index];
           if (row.block_type === 'table_row') {
@@ -1227,63 +1277,147 @@
             sections.push(formatWordRow(row));
           }
         }
-        return sections.join('\n');
+        return '<div class="word-document">' + sections.filter(Boolean).join('\n') + '</div>';
+      }
+
+      function buildWordInfoBlock() {
+        const categories = rows.reduce(function (acc, row) {
+          const category = row.category || '其他';
+          acc[category] = (acc[category] || 0) + 1;
+          return acc;
+        }, {});
+        const categoryText = Object.keys(categories).map(function (category) {
+          return category + ' ' + categories[category] + ' 条';
+        }).join('，') || '无';
+        const documentType = els.docTypeSelect.value || (currentAnalysis && currentAnalysis.documentType) || '其他';
+        const fileName = currentFileName || (rows[0] && rows[0].source_file) || '未命名.md';
+        return '<div class="word-info">'
+          + '<p><strong>文档：</strong>' + formatInlineMarkdown(fileName) + '</p>'
+          + '<p><strong>文档类型：</strong>' + formatInlineMarkdown(documentType) + '</p>'
+          + '<p><strong>内容统计：</strong>' + escapeHtml(String(rows.length)) + ' 条</p>'
+          + '<p><strong>分类汇总：</strong>' + formatInlineMarkdown(categoryText) + '</p>'
+          + '<p><strong>格式说明：</strong>当前 Word 文件是兼容 Word 打开的 HTML 文档，预览与导出使用同一套排版逻辑。</p>'
+          + '</div>';
       }
 
       function formatWordRow(row) {
-        const content = escapeHtml(row.content || '').replace(/\n/g, '<br>');
-        const category = row.block_type === 'heading' || row.block_type === 'horizontal_rule' ? '' : ' <span class="category">（分类：' + escapeHtml(row.category) + '）</span>';
+        const content = formatInlineMarkdown(row.content || '').replace(/\n/g, '<br>');
         if (row.block_type === 'heading') {
           const level = Math.min(Math.max(Number(row.heading_level) || 1, 1), 6);
           return '<h' + level + '>' + content + '</h' + level + '>';
         }
-        if (row.block_type === 'paragraph') return '<p>' + content + category + '</p>';
+        if (row.block_type === 'paragraph') return '<p>' + content + '</p>';
         if (row.block_type === 'list_item') {
           const margin = Math.max(Number(row.list_level) || 0, 0) * 24;
           const marker = row.ordered ? '1.' : '•';
-          return '<p class="word-list-item" style="margin-left:' + margin + 'px"><span class="list-marker">' + marker + '</span> ' + content + category + '</p>';
+          return '<p class="word-list-item" style="margin-left:' + margin + 'px"><span class="list-marker">' + marker + '</span> ' + content + '</p>';
         }
-        if (row.block_type === 'quote') return '<blockquote>' + content + category + '</blockquote>';
+        if (row.block_type === 'quote') return '<blockquote>' + content + '</blockquote>';
         if (row.block_type === 'code_block') return '<pre><code>' + escapeHtml(row.content || '') + '</code></pre>';
         if (row.block_type === 'horizontal_rule') return '<hr>';
-        if (row.type === 'narration') return '<p><strong>【旁白】</strong>' + content + category + '</p>';
-        if (row.type === 'npc') return '<p><strong>【' + escapeHtml(row.speaker || 'NPC') + '】</strong>' + content + category + '</p>';
-        if (row.type === 'player_choice') return '<div><strong>【玩家选项】</strong>' + category + buildChoiceList(row.content) + '</div>';
-        if (row.type === 'system') return '<p><strong>【系统文本】</strong>' + content + category + '</p>';
-        if (row.type === 'comment') return '<p><strong>【策划备注】</strong>' + content + category + '</p>';
-        return '<p>' + content + category + '</p>';
+        if (row.type === 'narration') return '<p><strong>【旁白】</strong>' + content + '</p>';
+        if (row.type === 'npc') return '<p><strong>【' + escapeHtml(row.speaker || 'NPC') + '】</strong>' + content + '</p>';
+        if (row.type === 'player_choice') return '<div><p><strong>【玩家选项】</strong></p>' + buildChoiceList(row.content) + '</div>';
+        if (row.type === 'system') return '<p><strong>【系统文本】</strong>' + content + '</p>';
+        if (row.type === 'comment') return '<p><strong>【策划备注】</strong>' + content + '</p>';
+        return '<p>' + content + '</p>';
       }
 
       function formatWordTable(group) {
         if (!group.length) return '';
+        const columns = collectWordTableColumns(group);
+        if (!columns.length || shouldUseFieldCards(columns)) {
+          return formatWordTableAsFieldCards(group, columns);
+        }
+        const caption = group[0].table_name ? '<p><strong>' + formatInlineMarkdown(group[0].table_name) + '</strong></p>' : '';
+        const widths = getWordColumnWidths(columns);
+        const colgroup = '<colgroup>' + columns.map(function (column, index) {
+          return '<col style="width:' + widths[index] + '%">';
+        }).join('') + '</colgroup>';
+        const head = '<tr>' + columns.map(function (column) { return '<th>' + formatInlineMarkdown(column) + '</th>'; }).join('') + '</tr>';
+        const body = group.map(function (row) {
+          return '<tr>' + columns.map(function (column) {
+            return '<td>' + formatInlineMarkdown((row.dynamic_fields && row.dynamic_fields[column]) || '').replace(/\n/g, '<br>') + '</td>';
+          }).join('') + '</tr>';
+        }).join('');
+        return '<div class="word-table-block">' + caption + '<table class="word-table">' + colgroup + '<thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
+      }
+
+      function collectWordTableColumns(group) {
         const columns = [];
         group.forEach(function (row) {
           Object.keys(row.dynamic_fields || {}).forEach(function (field) {
             if (columns.indexOf(field) === -1) columns.push(field);
           });
         });
-        if (!columns.length) {
-          return group.map(formatWordTableAsFields).join('\n');
-        }
-        const caption = group[0].table_name ? '<p><strong>' + escapeHtml(group[0].table_name) + '</strong></p>' : '';
-        const head = '<tr>' + columns.map(function (column) { return '<th>' + escapeHtml(column) + '</th>'; }).join('') + '</tr>';
-        const body = group.map(function (row) {
-          return '<tr>' + columns.map(function (column) {
-            return '<td>' + escapeHtml((row.dynamic_fields && row.dynamic_fields[column]) || '').replace(/\n/g, '<br>') + '</td>';
-          }).join('') + '</tr>';
-        }).join('');
-        return '<div class="word-table-block">' + caption + '<table class="word-table">' + head + body + '</table></div>';
+        return columns;
+      }
+
+      function shouldUseFieldCards(columns) {
+        return columns.length > 4;
+      }
+
+      function getWordColumnWidths(columns) {
+        const weights = columns.map(function (column) {
+          if (isWideWordColumn(column)) return 3;
+          if (isNarrowWordColumn(column)) return 1;
+          return 1.6;
+        });
+        const total = weights.reduce(function (sum, weight) { return sum + weight; }, 0) || 1;
+        return weights.map(function (weight) {
+          return Math.max(12, Math.round(weight / total * 100));
+        });
+      }
+
+      function isWideWordColumn(column) {
+        return /内容|说明|描述|效果|包装要求|机制说明/.test(String(column || ''));
+      }
+
+      function isNarrowWordColumn(column) {
+        return /^字段$|字段名|配置表|^类型$|标签|段落/.test(String(column || ''));
+      }
+
+      function formatWordTableAsFieldCards(group, columns) {
+        const tableName = group[0] && group[0].table_name ? '<p><strong>' + formatInlineMarkdown(group[0].table_name) + '</strong></p>' : '';
+        const cards = group.map(function (row, rowIndex) {
+          const fields = columns.length ? columns : ['内容'];
+          const lines = fields.map(function (column) {
+            const value = columns.length ? ((row.dynamic_fields && row.dynamic_fields[column]) || '') : (row.content || '');
+            if (!String(value || '').trim()) return '';
+            return '<p class="table-field-line"><span class="table-field-label">' + formatInlineMarkdown(column) + '：</span>' + formatInlineMarkdown(value).replace(/\n/g, '<br>') + '</p>';
+          }).filter(Boolean).join('');
+          return '<div class="table-field-block"><p class="table-field-title">【记录 ' + escapeHtml(String(row.row_index || rowIndex + 1)) + '】</p>' + lines + '</div>';
+        }).join('\n');
+        return '<div class="word-table-block">' + tableName + cards + '</div>';
       }
 
       function formatWordTableAsFields(row) {
-        return '<div class="table-field-block"><strong>' + escapeHtml(row.table_id || '表格') + ' 第 ' + escapeHtml(row.row_index || '') + ' 行</strong><br>' + escapeHtml(row.content || '').replace(/；/g, '<br>') + '</div>';
+        return '<div class="table-field-block"><p class="table-field-title">【记录 ' + escapeHtml(row.row_index || '') + '】</p><p>' + formatInlineMarkdown(row.content || '').replace(/；/g, '<br>') + '</p></div>';
+      }
+
+      function formatInlineMarkdown(value) {
+        let html = escapeHtml(value == null ? '' : String(value));
+        const codeParts = [];
+        html = html.replace(/`([^`]+)`/g, function (match, code) {
+          const token = '\u0000CODE' + codeParts.length + '\u0000';
+          codeParts.push('<code class="inline-code">' + code + '</code>');
+          return token;
+        });
+        html = html.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, function (match, text, url) {
+          return '<a href="' + url + '">' + text + '</a>（' + url + '）';
+        });
+        html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+        codeParts.forEach(function (code, index) {
+          html = html.replace('\u0000CODE' + index + '\u0000', function () { return code; });
+        });
+        return html;
       }
 
       function buildChoiceList(content) {
         const choices = String(content || '').split(/\n+/).map(function (line) { return line.trim(); }).filter(Boolean);
         if (!choices.length) return '';
         return '<ol>' + choices.map(function (choice) {
-          return '<li>' + escapeHtml(choice.replace(/^\d+[.、]\s*/, '')) + '</li>';
+          return '<li>' + formatInlineMarkdown(choice.replace(/^\d+[.、]\s*/, '')) + '</li>';
         }).join('') + '</ol>';
       }
 
@@ -1292,9 +1426,10 @@
           setStatus('当前没有解析结果，不能导出 Word。', true);
           return;
         }
-        const html = '\ufeff<html><head><meta charset="utf-8"><title>PXN-Reader Word</title><style>body{font-family:"Microsoft YaHei",serif;line-height:1.7}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}h4,h5,h6{font-size:15px}p{margin:8px 0}blockquote{border-left:4px solid #999;padding-left:12px;color:#555}pre{background:#f4f4f4;padding:10px;white-space:pre-wrap}table{border-collapse:collapse;margin:10px 0}td,th{border:1px solid #999;padding:6px;vertical-align:top}.category{color:#666;font-size:12px}</style></head><body>' + buildWordSectionsHtml() + '</body></html>';
+        // 这里导出的是兼容 Word 打开的 HTML 文档，继续使用 .doc 后缀便于文案组直接用 Word 打开归档。
+        const html = '\ufeff<html><head><meta charset="utf-8"><title>PXN-Reader Word</title><style>' + WORD_EXPORT_CSS + '</style></head><body>' + buildWordSectionsHtml() + '</body></html>';
         downloadBlob(html, makeBaseName() + '.doc', 'application/msword;charset=utf-8');
-        setStatus('Word 已导出。');
+        setStatus('Word 已导出（兼容 Word 打开的 HTML 文档）。');
       }
 
       function copyReadingDraft() {
