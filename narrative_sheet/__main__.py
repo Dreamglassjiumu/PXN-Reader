@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from .exporters import export_docx, export_xlsx
@@ -10,6 +11,13 @@ from .parser import parse_markdown_file
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "build-site":
+        from .site_generator import main as build_site_main
+
+        sys.argv = [sys.argv[0], *sys.argv[2:]]
+        build_site_main()
+        return
+
     parser = argparse.ArgumentParser(
         prog="python -m narrative_sheet",
         description="Convert game narrative Markdown into Excel and Word documents.",

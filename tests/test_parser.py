@@ -93,3 +93,70 @@ def test_cli_generates_xlsx_and_docx(tmp_path):
     assert xlsx_path.stat().st_size > 0
     assert docx_path.is_file()
     assert docx_path.stat().st_size > 0
+
+
+def test_site_generator_builds_static_site(tmp_path):
+    from datetime import datetime, timezone
+
+    from narrative_sheet.site_generator import build_site
+
+    content_dir = tmp_path / "content"
+    (content_dir / "main").mkdir(parents=True)
+    (content_dir / "side").mkdir(parents=True)
+    (content_dir / "main" / "story_001.md").write_text(
+        """# Chapter\n\n## Quest\n\n### Scene\n\n[Narration]\nHello from the main story.\n""",
+        encoding="utf-8",
+    )
+    (content_dir / "side" / "quest_001.md").write_text(
+        """# Side\n\n## Quest\n\n### Scene\n\n[NPC: Bob]\nNeed help?\n""",
+        encoding="utf-8",
+    )
+    public_dir = tmp_path / "public"
+
+    site_files = build_site(
+        content_dir=content_dir,
+        public_dir=public_dir,
+        generated_at=datetime(2026, 5, 7, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert len(site_files) == 2
+    assert (public_dir / "index.html").is_file()
+    assert (public_dir / "exports" / "story_001.xlsx").is_file()
+    assert (public_dir / "exports" / "story_001.docx").is_file()
+    assert (public_dir / "exports" / "quest_001.xlsx").is_file()
+    assert (public_dir / "exports" / "quest_001.docx").is_file()
+    assert (public_dir / "markdown" / "main" / "story_001.md").is_file()
+
+    html = (public_dir / "index.html").read_text(encoding="utf-8")
+    assert "PXN Reader 文案中心" in html
+    assert "最近更新时间" in html
+    assert "分类筛选" in html
+    assert "主线剧情" in html
+    assert "支线任务" in html
+    assert "story_001.md" in html
+    assert "exports/story_001.xlsx" in html
+    assert "markdown/main/story_001.md" in html
+
+
+def test_build_site_command_preserves_existing_cli(tmp_path):
+    public_dir = tmp_path / "public"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "narrative_sheet",
+            "build-site",
+            "--content-dir",
+            "content",
+            "--public-dir",
+            str(public_dir),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (public_dir / "index.html").is_file()
+    assert (public_dir / "exports" / "story_001.xlsx").is_file()
