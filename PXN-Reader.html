@@ -482,7 +482,17 @@
     .word-preview h1::after { content: none; }
     .word-preview h2 { margin: 18px 0 10px; color: #f2dfb2; font-size: 20px; }
     .word-preview h3 { margin: 14px 0 8px; color: #d8ba74; font-size: 17px; }
+    .word-preview h4 { margin: 12px 0 7px; color: #d2ab63; font-size: 15px; }
+    .word-preview h5, .word-preview h6 { margin: 10px 0 6px; color: #caa35e; font-size: 14px; }
     .word-preview p { margin: 8px 0; }
+    .word-preview blockquote { margin: 12px 0; padding: 8px 12px; border-left: 4px solid var(--brass); background: rgba(185, 148, 77, 0.10); color: var(--ink-soft); }
+    .word-preview pre { overflow: auto; padding: 12px; border: 1px solid rgba(185, 148, 77, 0.34); border-radius: 10px; background: rgba(0, 0, 0, 0.38); }
+    .word-preview code { font-family: Consolas, "Microsoft YaHei", monospace; }
+    .word-preview hr { border: 0; border-top: 1px solid rgba(209, 177, 112, 0.55); margin: 18px 0; }
+    .word-preview .word-table-block { overflow-x: auto; margin: 12px 0 18px; }
+    .word-preview .word-table { min-width: 0; width: 100%; border: 1px solid rgba(185, 148, 77, 0.36); }
+    .word-preview .word-table th, .word-preview .word-table td { border: 1px solid rgba(185, 148, 77, 0.24); padding: 8px; }
+    .word-preview .word-list-item .list-marker { color: #f2dfb2; font-weight: 700; }
     .word-preview .category { color: var(--muted); font-size: 12px; }
 
     @media (max-width: 720px) {
@@ -548,7 +558,7 @@
             <h2>Markdown 内容</h2>
           </div>
           <textarea id="markdownText" placeholder="请选择 Markdown 文件，或直接在这里粘贴 Markdown 内容。"></textarea>
-          <p class="hint">识别规则：# 作为章节，## 作为任务，### 作为场景；支持 [NPC: 角色名]、[PlayerChoice]、[Narration]、[System]、[Comment]。</p>
+          <p class="hint">识别规则：支持 # 到 ###### 标题、段落、列表、表格、引用、代码块、分隔线；同时兼容 [NPC: 角色名]、[PlayerChoice]、[Narration]、[System]、[Comment] 剧情块。</p>
         </section>
 
         <section class="card section">
@@ -575,20 +585,7 @@
           <div id="wordPreview" class="word-preview" hidden></div>
           <div id="tableWrap" class="table-wrap" hidden>
             <table id="previewTable">
-              <thead>
-                <tr>
-                  <th>content_id</th>
-                  <th>分类</th>
-                  <th>source_file</th>
-                  <th>chapter</th>
-                  <th>quest</th>
-                  <th>scene</th>
-                  <th>type</th>
-                  <th>speaker</th>
-                  <th>content</th>
-                  <th>char_count</th>
-                </tr>
-              </thead>
+              <thead></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -619,6 +616,21 @@
         System: 'system',
         Comment: 'comment'
       };
+      const BASE_EXCEL_COLUMNS = [
+        { field: 'content_id', label: 'content_id' },
+        { field: 'category', label: '分类' },
+        { field: 'source_file', label: 'source_file' },
+        { field: 'section_path', label: 'section_path' },
+        { field: 'heading_level', label: 'heading_level' },
+        { field: 'block_type', label: 'block_type' },
+        { field: 'table_id', label: 'table_id' },
+        { field: 'table_name', label: 'table_name' },
+        { field: 'row_index', label: 'row_index' },
+        { field: 'speaker', label: 'speaker' },
+        { field: 'content', label: 'content' },
+        { field: 'char_count', label: 'char_count' }
+      ];
+      const TABLE_CONTENT_KEYWORDS = ['内容', '说明', '描述', '效果', '需求', '机制', '备注', '正文', '包装要求'];
 
       const els = {
         file: document.getElementById('mdFile'),
@@ -644,6 +656,7 @@
         excelPreviewBtn: document.getElementById('excelPreviewBtn'),
         wordPreview: document.getElementById('wordPreview'),
         tableWrap: document.getElementById('tableWrap'),
+        tableHead: document.querySelector('#previewTable thead'),
         tableBody: document.querySelector('#previewTable tbody')
       };
 
@@ -695,7 +708,7 @@
       function parseCurrentText() {
         const text = els.markdownText.value || '';
         if (!text.trim()) {
-          setStatus('没有可解析的 Markdown 内容。', true);
+          setStatus('没有识别到可解析内容，请检查 Markdown 文件是否为空。', true);
           return;
         }
         rows = parseMarkdown(text, currentFileName || '未命名.md');
@@ -705,59 +718,172 @@
         renderPreviews();
         updateStats();
         setExportState(rows.length > 0);
-        setStatus(rows.length ? '解析完成。' : '没有识别到支持的文本块。', rows.length === 0);
+        setStatus(rows.length ? buildParseStatus(rows) : '没有识别到可解析内容，请检查 Markdown 文件是否为空。', rows.length === 0);
+      }
+
+
+      function buildParseStatus(parsedRows) {
+        const counts = countBlocks(parsedRows);
+        const uniqueTables = new Set(parsedRows.map(function (row) { return row.table_id; }).filter(Boolean)).size;
+        const summary = '解析完成：共 ' + parsedRows.length + ' 条，表格 ' + uniqueTables + ' 个，列表 ' + (counts.list_item || 0) + ' 条，段落 ' + (counts.paragraph || 0) + ' 段。';
+        if (uniqueTables || counts.list_item || hasRequirementContent(parsedRows)) {
+          return summary + ' 检测到表格、列表或需求内容，已按通用文档方式解析。';
+        }
+        return summary;
+      }
+
+      function countBlocks(parsedRows) {
+        return parsedRows.reduce(function (acc, row) {
+          const blockType = row.block_type || row.type || 'paragraph';
+          acc[blockType] = (acc[blockType] || 0) + 1;
+          return acc;
+        }, {});
+      }
+
+      function hasRequirementContent(parsedRows) {
+        return parsedRows.some(function (row) {
+          return /字段|配置表|参数|数值|规则|流程|验收|需求|说明/.test([row.section_path, row.content, Object.keys(row.dynamic_fields || {}).join(' ')].join(' '));
+        });
       }
 
       function parseMarkdown(text, sourceFile) {
         const parsed = [];
+        const sectionTitles = [];
         let chapter = '';
         let quest = '';
         let scene = '';
         let current = null;
+        let tableCount = 0;
         const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
-        lines.forEach(function (rawLine) {
+        for (let i = 0; i < lines.length; i += 1) {
+          const rawLine = lines[i];
           const line = rawLine.replace(/\s+$/, '');
           const stripped = line.trim();
-          const heading = stripped.match(/^(#{1,3})\s+(.+?)\s*$/);
-          if (heading) {
+
+          if (current && current.block_type !== 'paragraph') {
+            const nextStoryBlock = stripped.match(/^\[(NPC:\s*([^\]]+)|PlayerChoice|Narration|System|Comment)\]\s*(.*)$/);
+            const nextHeading = stripped.match(/^(#{1,6})\s+(.+?)\s*$/);
+            if (!stripped) {
+              flushCurrent();
+              continue;
+            }
+            if (!nextStoryBlock && !nextHeading) {
+              current.lines.push(stripped);
+              continue;
+            }
             flushCurrent();
+          }
+
+          if (!stripped) {
+            flushParagraph();
+            continue;
+          }
+
+          const codeStart = stripped.match(/^```\s*(.*)$/);
+          if (codeStart) {
+            flushParagraph();
+            const codeLines = [];
+            i += 1;
+            while (i < lines.length && !lines[i].trim().match(/^```\s*$/)) {
+              codeLines.push(lines[i].replace(/\s+$/, ''));
+              i += 1;
+            }
+            addRow({ block_type: 'code_block', type: 'code_block', content: codeLines.join('\n'), code_language: codeStart[1].trim() });
+            continue;
+          }
+
+          const heading = stripped.match(/^(#{1,6})\s+(.+?)\s*$/);
+          if (heading) {
+            flushParagraph();
             const level = heading[1].length;
             const title = heading[2].trim();
-            if (level === 1) {
-              chapter = title;
-              quest = '';
-              scene = '';
-            } else if (level === 2) {
-              quest = title;
-              scene = '';
-            } else {
-              scene = title;
-            }
-            return;
+            sectionTitles[level - 1] = title;
+            sectionTitles.length = level;
+            chapter = sectionTitles[0] || '';
+            quest = sectionTitles[1] || '';
+            scene = sectionTitles[2] || '';
+            addRow({ block_type: 'heading', type: 'heading', heading_level: level, content: title });
+            continue;
           }
 
-          const block = stripped.match(/^\[(NPC:\s*([^\]]+)|PlayerChoice|Narration|System|Comment)\]\s*(.*)$/);
-          if (block) {
-            flushCurrent();
-            const token = block[1];
-            const inline = (block[3] || '').trim();
+          if (isTableStart(lines, i)) {
+            flushParagraph();
+            tableCount += 1;
+            const tableId = 'TABLE_' + String(tableCount).padStart(4, '0');
+            const headers = splitMarkdownTableRow(lines[i]);
+            i += 2;
+            let rowIndex = 1;
+            while (i < lines.length && isTableContentLine(lines[i])) {
+              const values = splitMarkdownTableRow(lines[i]);
+              const dynamicFields = {};
+              headers.forEach(function (header, cellIndex) {
+                dynamicFields[header || ('列' + (cellIndex + 1))] = values[cellIndex] == null ? '' : values[cellIndex];
+              });
+              addRow({
+                block_type: 'table_row',
+                type: 'table_row',
+                table_id: tableId,
+                table_name: getCurrentTableName(),
+                row_index: rowIndex,
+                content: makeTableRowContent(headers, dynamicFields),
+                dynamic_fields: dynamicFields
+              });
+              rowIndex += 1;
+              i += 1;
+            }
+            i -= 1;
+            continue;
+          }
+
+          const storyBlock = stripped.match(/^\[(NPC:\s*([^\]]+)|PlayerChoice|Narration|System|Comment)\]\s*(.*)$/);
+          if (storyBlock) {
+            flushParagraph();
+            const token = storyBlock[1];
+            const inline = (storyBlock[3] || '').trim();
             if (token.indexOf('NPC:') === 0) {
-              current = { chapter, quest, scene, type: 'npc', speaker: (block[2] || '').trim(), lines: inline ? [inline] : [] };
+              current = { type: 'npc', block_type: 'npc', speaker: (storyBlock[2] || '').trim(), lines: inline ? [inline] : [] };
             } else {
-              current = { chapter, quest, scene, type: TYPE_LABELS[token], speaker: '', lines: inline ? [inline] : [] };
+              current = { type: TYPE_LABELS[token], block_type: TYPE_LABELS[token], speaker: '', lines: inline ? [inline] : [] };
             }
-            return;
+            continue;
           }
 
-          if (current) {
-            if (stripped) {
-              current.lines.push(stripped);
-            } else {
-              flushCurrent();
-            }
+          if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+            flushParagraph();
+            addRow({ block_type: 'horizontal_rule', type: 'horizontal_rule', content: '' });
+            continue;
           }
-        });
+
+          if (/^\s*>\s?/.test(line)) {
+            flushParagraph();
+            const quoteLines = [];
+            while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+              quoteLines.push(lines[i].replace(/^\s*>\s?/, '').replace(/\s+$/, ''));
+              i += 1;
+            }
+            i -= 1;
+            addRow({ block_type: 'quote', type: 'quote', content: quoteLines.join('\n').trim() });
+            continue;
+          }
+
+          const listMatch = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.+)$/);
+          if (listMatch) {
+            flushParagraph();
+            addRow({
+              block_type: 'list_item',
+              type: 'list_item',
+              list_level: Math.floor(listMatch[1].replace(/\t/g, '  ').length / 2),
+              list_marker: listMatch[2],
+              ordered: /^\d/.test(listMatch[2]),
+              content: listMatch[3].trim()
+            });
+            continue;
+          }
+
+          if (!current) current = { type: 'paragraph', block_type: 'paragraph', speaker: '', lines: [] };
+          current.lines.push(stripped);
+        }
         flushCurrent();
 
         return parsed.map(function (row, index) {
@@ -767,20 +893,82 @@
           return row;
         });
 
+        function flushParagraph() {
+          if (current && current.block_type === 'paragraph') flushCurrent();
+        }
+
         function flushCurrent() {
           if (!current) return;
           const content = current.lines.join('\n').trim();
-          parsed.push({
-            source_file: sourceFile,
-            chapter: current.chapter,
-            quest: current.quest,
-            scene: current.scene,
-            type: current.type,
-            speaker: current.speaker,
-            content: content
-          });
+          if (content || current.block_type !== 'paragraph') {
+            addRow({
+              block_type: current.block_type || current.type,
+              type: current.type,
+              speaker: current.speaker || '',
+              content: content
+            });
+          }
           current = null;
         }
+
+        function addRow(data) {
+          parsed.push(Object.assign({
+            source_file: sourceFile,
+            chapter: chapter,
+            quest: quest,
+            scene: scene,
+            section_path: sectionTitles.filter(Boolean).join(' / '),
+            heading_level: '',
+            block_type: 'paragraph',
+            type: 'paragraph',
+            table_id: '',
+            table_name: '',
+            row_index: '',
+            speaker: '',
+            content: '',
+            dynamic_fields: {}
+          }, data));
+        }
+
+        function getCurrentTableName() {
+          for (let level = sectionTitles.length - 1; level >= 0; level -= 1) {
+            if (sectionTitles[level]) return sectionTitles[level];
+          }
+          return '';
+        }
+      }
+
+      function isTableStart(lines, index) {
+        return isTableContentLine(lines[index]) && index + 1 < lines.length && isTableSeparatorLine(lines[index + 1]);
+      }
+
+      function isTableContentLine(line) {
+        const trimmed = String(line || '').trim();
+        return trimmed.indexOf('|') !== -1 && /^\|?.+\|.+\|?$/.test(trimmed);
+      }
+
+      function isTableSeparatorLine(line) {
+        if (!isTableContentLine(line)) return false;
+        const cells = splitMarkdownTableRow(line);
+        return cells.length > 0 && cells.every(function (cell) { return /^:?-{3,}:?$/.test(cell.trim()); });
+      }
+
+      function splitMarkdownTableRow(line) {
+        let trimmed = String(line || '').trim();
+        if (trimmed.charAt(0) === '|') trimmed = trimmed.slice(1);
+        if (trimmed.charAt(trimmed.length - 1) === '|') trimmed = trimmed.slice(0, -1);
+        return trimmed.split('|').map(function (cell) { return cell.trim(); });
+      }
+
+      function makeTableRowContent(headers, dynamicFields) {
+        const preferred = headers.find(function (header) {
+          return TABLE_CONTENT_KEYWORDS.some(function (keyword) { return String(header || '').indexOf(keyword) !== -1; });
+        });
+        if (preferred && dynamicFields[preferred]) return dynamicFields[preferred];
+        return headers.map(function (header) {
+          const name = header || '列';
+          return name + '：' + (dynamicFields[name] || '');
+        }).join('；');
       }
 
       function suggestCategory(row) {
@@ -795,32 +983,37 @@
 
       function analyzeDocument(text, parsedRows) {
         const source = String(text || '').replace(/\r\n/g, '\n');
+        const blockCounts = countBlocks(parsedRows);
+        const tableCount = new Set(parsedRows.map(function (row) { return row.table_id; }).filter(Boolean)).size;
+        const dynamicHeaderText = parsedRows.map(function (row) { return Object.keys(row.dynamic_fields || {}).join(' '); }).join(' ');
         const stats = {
           npcTags: (source.match(/\[NPC:\s*[^\]]+\]/g) || []).length,
           narrationTags: (source.match(/\[Narration\]/g) || []).length,
           choiceTags: (source.match(/\[PlayerChoice\]/g) || []).length,
           systemTags: (source.match(/\[System\]/g) || []).length,
-          chapters: (source.match(/^#\s+/gm) || []).length,
-          scenes: (source.match(/^###\s+/gm) || []).length,
-          tables: (source.match(/^\s*\|.*\|\s*$/gm) || []).length,
-          lists: (source.match(/^\s*(?:[-*+]|\d+\.)\s+/gm) || []).length,
+          headings: blockCounts.heading || 0,
+          paragraphs: blockCounts.paragraph || 0,
+          tables: tableCount,
+          tableRows: blockCounts.table_row || 0,
+          lists: blockCounts.list_item || 0,
           worldKeywords: countKeywordMatches(source, ['世界观', '设定', '背景', '历史', '阵营', '地理', '种族', '宗教', '纪元']),
-          requirementKeywords: countKeywordMatches(source, ['需求', '功能', '规则', '流程', '状态', '优先级', '验收', '交互', 'UI']),
-          configKeywords: countKeywordMatches(source, ['配置', '字段', '参数', '数值', '条件', '触发']),
+          requirementKeywords: countKeywordMatches(source, ['需求', '说明', '功能', '规则', '流程', '状态', '优先级', '验收', '交互', 'UI']),
+          configKeywords: countKeywordMatches(source + ' ' + dynamicHeaderText, ['配置表', '配置', '字段', '参数', '数值', '条件', '触发', 'param', 'content', 'title', 'tagText', 'heroAwake']),
           systemKeywords: countKeywordMatches(source, ['提示', '按钮', '弹窗', '报错', 'UI文本', '系统提示'])
         };
         const shortNpcRows = parsedRows.filter(function (row) {
           return row.type === 'npc' && row.char_count > 0 && row.char_count <= 36;
         }).length;
         const rowCount = parsedRows.length || 1;
-        const storyScore = stats.npcTags + stats.narrationTags + stats.choiceTags + stats.chapters + stats.scenes;
+        const storyScore = stats.npcTags * 2 + stats.narrationTags + stats.choiceTags + shortNpcRows;
         const npcScore = stats.npcTags * 2 + shortNpcRows;
         const worldScore = stats.worldKeywords;
-        const configScore = stats.configKeywords + stats.tables + Math.floor(stats.lists / 2);
-        const requirementScore = stats.requirementKeywords + stats.tables + Math.floor(stats.lists / 2);
+        const configScore = stats.configKeywords + stats.tables * 2 + Math.floor(stats.tableRows / 3);
+        const requirementScore = stats.requirementKeywords + stats.tables * 2 + Math.floor(stats.lists / 2);
         const systemScore = stats.systemTags * 2 + stats.systemKeywords;
 
         let documentType = '其他';
+        let exportMode = 'Word 和 Excel';
         let reason = '文档类型不太明确，建议同时查看 Word 预览和 Excel 预览。';
         if (systemScore >= 4 || (stats.systemTags >= 2 && systemScore >= 2)) {
           documentType = '系统文本';
@@ -828,23 +1021,27 @@
         } else if (npcScore >= 8 || (stats.npcTags >= 4 && shortNpcRows / rowCount >= 0.45)) {
           documentType = 'NPC对白';
           reason = '检测到较多 NPC 标签和短对白，建议导出为 Excel，方便按角色和场景审阅。';
-        } else if (storyScore >= 5 && (stats.chapters || stats.scenes || stats.narrationTags || stats.choiceTags)) {
+        } else if (storyScore >= 5 && (stats.npcTags || stats.narrationTags || stats.choiceTags)) {
           documentType = '剧情文案';
           reason = '检测到章节、场景和对白内容，建议导出为 Word，方便连续阅读。';
+        } else if (configScore >= 5 && stats.configKeywords >= stats.requirementKeywords) {
+          documentType = '配置文案';
+          reason = '检测到配置表、字段、参数或内容字段，建议导出为 Excel，方便核对字段。';
+        } else if (requirementScore >= 5 || (stats.tables >= 2 && /规则|流程|验收|需求|说明|字段/.test(source))) {
+          documentType = '需求说明';
+          reason = '检测到表格、列表或需求关键词，建议导出为 Excel，方便筛选、审阅和拆条。';
         } else if (worldScore >= 3) {
           documentType = '世界观设定';
           reason = '检测到较多世界观、背景、历史或阵营关键词，建议导出为 Word，方便按段落阅读。';
-        } else if (configScore >= 4 && stats.configKeywords >= stats.requirementKeywords) {
-          documentType = '配置文案';
-          reason = '检测到较多配置、字段、参数或表格内容，建议导出为 Excel，方便核对字段。';
-        } else if (requirementScore >= 4) {
-          documentType = '需求说明';
-          reason = '检测到较多列表、表格和需求关键词，建议导出为 Excel，方便筛选和审阅。';
+        } else if (stats.headings >= 2 && stats.paragraphs >= 2 && stats.tables === 0) {
+          reason = '检测到较多标题和段落，建议优先查看 Word 预览进行连续阅读。';
+          exportMode = 'Word';
         }
 
+        if (documentType !== '其他') exportMode = EXPORT_MODE_BY_DOCUMENT_TYPE[documentType];
         return {
           documentType: documentType,
-          exportMode: EXPORT_MODE_BY_DOCUMENT_TYPE[documentType],
+          exportMode: exportMode,
           reason: reason
         };
       }
@@ -886,42 +1083,60 @@
       }
 
       function renderTable() {
+        els.tableHead.textContent = '';
         els.tableBody.textContent = '';
+        const dynamicColumns = collectDynamicColumns();
+        const headerTr = document.createElement('tr');
+        BASE_EXCEL_COLUMNS.concat(dynamicColumns.map(function (field) { return { field: field, label: field, dynamic: true }; })).forEach(function (column) {
+          const th = document.createElement('th');
+          th.textContent = column.label;
+          headerTr.appendChild(th);
+        });
+        els.tableHead.appendChild(headerTr);
+
         rows.forEach(function (row, index) {
           const tr = document.createElement('tr');
-          appendCell(tr, row.content_id);
-
-          const categoryCell = document.createElement('td');
-          const select = document.createElement('select');
-          select.setAttribute('aria-label', '分类');
-          CATEGORY_OPTIONS.forEach(function (category) {
-            const option = document.createElement('option');
-            option.value = category;
-            option.textContent = category;
-            option.selected = category === row.category;
-            select.appendChild(option);
+          BASE_EXCEL_COLUMNS.forEach(function (column) {
+            if (column.field === 'category') {
+              const categoryCell = document.createElement('td');
+              const select = document.createElement('select');
+              select.setAttribute('aria-label', '分类');
+              CATEGORY_OPTIONS.forEach(function (category) {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                option.selected = category === row.category;
+                select.appendChild(option);
+              });
+              select.addEventListener('change', function () {
+                rows[index].category = select.value;
+                renderWordPreview();
+                setStatus('分类已更新。');
+              });
+              categoryCell.appendChild(select);
+              tr.appendChild(categoryCell);
+            } else {
+              appendCell(tr, row[column.field], column.field === 'content' ? 'content-cell' : '');
+            }
           });
-          select.addEventListener('change', function () {
-            rows[index].category = select.value;
-            renderWordPreview();
-            setStatus('分类已更新。');
+          dynamicColumns.forEach(function (field) {
+            appendCell(tr, row.dynamic_fields ? row.dynamic_fields[field] : '', 'content-cell');
           });
-          categoryCell.appendChild(select);
-          tr.appendChild(categoryCell);
-
-          appendCell(tr, row.source_file);
-          appendCell(tr, row.chapter);
-          appendCell(tr, row.quest);
-          appendCell(tr, row.scene);
-          appendCell(tr, row.type);
-          appendCell(tr, row.speaker);
-          appendCell(tr, row.content, 'content-cell');
-          appendCell(tr, row.char_count);
           els.tableBody.appendChild(tr);
         });
 
         els.emptyState.hidden = rows.length > 0;
         els.tableWrap.hidden = rows.length === 0 || previewMode !== 'excel';
+      }
+
+      function collectDynamicColumns() {
+        const columns = [];
+        rows.forEach(function (row) {
+          Object.keys(row.dynamic_fields || {}).forEach(function (field) {
+            if (columns.indexOf(field) === -1) columns.push(field);
+          });
+        });
+        return columns;
       }
 
       function appendCell(tr, value, className) {
@@ -977,10 +1192,12 @@
           setStatus('当前没有解析结果，不能导出 Excel。', true);
           return;
         }
-        const fields = ['content_id', 'category', 'source_file', 'chapter', 'quest', 'scene', 'type', 'speaker', 'content', 'char_count'];
-        const headers = ['content_id', '分类', 'source_file', 'chapter', 'quest', 'scene', 'type', 'speaker', 'content', 'char_count'];
-        const tableRows = [headers].concat(rows.map(function (row) {
-          return fields.map(function (field) { return row[field]; });
+        const dynamicColumns = collectDynamicColumns();
+        const columns = BASE_EXCEL_COLUMNS.concat(dynamicColumns.map(function (field) { return { field: field, label: field, dynamic: true }; }));
+        const tableRows = [columns.map(function (column) { return column.label; })].concat(rows.map(function (row) {
+          return columns.map(function (column) {
+            return column.dynamic ? ((row.dynamic_fields && row.dynamic_fields[column.field]) || '') : row[column.field];
+          });
         }));
         const tableHtml = tableRows.map(function (cells, rowIndex) {
           const tag = rowIndex === 0 ? 'th' : 'td';
@@ -995,39 +1212,71 @@
 
       function buildWordSectionsHtml() {
         const sections = [];
-        let lastChapter = null;
-        let lastQuest = null;
-        let lastScene = null;
-        rows.forEach(function (row) {
-          if (row.chapter && row.chapter !== lastChapter) {
-            sections.push('<h1>' + escapeHtml(row.chapter) + '</h1>');
-            lastChapter = row.chapter;
-            lastQuest = null;
-            lastScene = null;
+        for (let index = 0; index < rows.length; index += 1) {
+          const row = rows[index];
+          if (row.block_type === 'table_row') {
+            const group = [];
+            const tableId = row.table_id;
+            while (index < rows.length && rows[index].block_type === 'table_row' && rows[index].table_id === tableId) {
+              group.push(rows[index]);
+              index += 1;
+            }
+            index -= 1;
+            sections.push(formatWordTable(group));
+          } else {
+            sections.push(formatWordRow(row));
           }
-          if (row.quest && row.quest !== lastQuest) {
-            sections.push('<h2>' + escapeHtml(row.quest) + '</h2>');
-            lastQuest = row.quest;
-            lastScene = null;
-          }
-          if (row.scene && row.scene !== lastScene) {
-            sections.push('<h3>' + escapeHtml(row.scene) + '</h3>');
-            lastScene = row.scene;
-          }
-          sections.push(formatWordRow(row));
-        });
+        }
         return sections.join('\n');
       }
 
       function formatWordRow(row) {
-        const content = escapeHtml(row.content).replace(/\n/g, '<br>');
-        const category = ' <span class="category">（分类：' + escapeHtml(row.category) + '）</span>';
+        const content = escapeHtml(row.content || '').replace(/\n/g, '<br>');
+        const category = row.block_type === 'heading' || row.block_type === 'horizontal_rule' ? '' : ' <span class="category">（分类：' + escapeHtml(row.category) + '）</span>';
+        if (row.block_type === 'heading') {
+          const level = Math.min(Math.max(Number(row.heading_level) || 1, 1), 6);
+          return '<h' + level + '>' + content + '</h' + level + '>';
+        }
+        if (row.block_type === 'paragraph') return '<p>' + content + category + '</p>';
+        if (row.block_type === 'list_item') {
+          const margin = Math.max(Number(row.list_level) || 0, 0) * 24;
+          const marker = row.ordered ? '1.' : '•';
+          return '<p class="word-list-item" style="margin-left:' + margin + 'px"><span class="list-marker">' + marker + '</span> ' + content + category + '</p>';
+        }
+        if (row.block_type === 'quote') return '<blockquote>' + content + category + '</blockquote>';
+        if (row.block_type === 'code_block') return '<pre><code>' + escapeHtml(row.content || '') + '</code></pre>';
+        if (row.block_type === 'horizontal_rule') return '<hr>';
         if (row.type === 'narration') return '<p><strong>【旁白】</strong>' + content + category + '</p>';
         if (row.type === 'npc') return '<p><strong>【' + escapeHtml(row.speaker || 'NPC') + '】</strong>' + content + category + '</p>';
         if (row.type === 'player_choice') return '<div><strong>【玩家选项】</strong>' + category + buildChoiceList(row.content) + '</div>';
         if (row.type === 'system') return '<p><strong>【系统文本】</strong>' + content + category + '</p>';
         if (row.type === 'comment') return '<p><strong>【策划备注】</strong>' + content + category + '</p>';
         return '<p>' + content + category + '</p>';
+      }
+
+      function formatWordTable(group) {
+        if (!group.length) return '';
+        const columns = [];
+        group.forEach(function (row) {
+          Object.keys(row.dynamic_fields || {}).forEach(function (field) {
+            if (columns.indexOf(field) === -1) columns.push(field);
+          });
+        });
+        if (!columns.length) {
+          return group.map(formatWordTableAsFields).join('\n');
+        }
+        const caption = group[0].table_name ? '<p><strong>' + escapeHtml(group[0].table_name) + '</strong></p>' : '';
+        const head = '<tr>' + columns.map(function (column) { return '<th>' + escapeHtml(column) + '</th>'; }).join('') + '</tr>';
+        const body = group.map(function (row) {
+          return '<tr>' + columns.map(function (column) {
+            return '<td>' + escapeHtml((row.dynamic_fields && row.dynamic_fields[column]) || '').replace(/\n/g, '<br>') + '</td>';
+          }).join('') + '</tr>';
+        }).join('');
+        return '<div class="word-table-block">' + caption + '<table class="word-table">' + head + body + '</table></div>';
+      }
+
+      function formatWordTableAsFields(row) {
+        return '<div class="table-field-block"><strong>' + escapeHtml(row.table_id || '表格') + ' 第 ' + escapeHtml(row.row_index || '') + ' 行</strong><br>' + escapeHtml(row.content || '').replace(/；/g, '<br>') + '</div>';
       }
 
       function buildChoiceList(content) {
@@ -1043,7 +1292,7 @@
           setStatus('当前没有解析结果，不能导出 Word。', true);
           return;
         }
-        const html = '\ufeff<html><head><meta charset="utf-8"><title>PXN-Reader Word</title><style>body{font-family:"Microsoft YaHei",serif;line-height:1.7}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}p{margin:8px 0}.category{color:#666;font-size:12px}</style></head><body>' + buildWordSectionsHtml() + '</body></html>';
+        const html = '\ufeff<html><head><meta charset="utf-8"><title>PXN-Reader Word</title><style>body{font-family:"Microsoft YaHei",serif;line-height:1.7}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}h4,h5,h6{font-size:15px}p{margin:8px 0}blockquote{border-left:4px solid #999;padding-left:12px;color:#555}pre{background:#f4f4f4;padding:10px;white-space:pre-wrap}table{border-collapse:collapse;margin:10px 0}td,th{border:1px solid #999;padding:6px;vertical-align:top}.category{color:#666;font-size:12px}</style></head><body>' + buildWordSectionsHtml() + '</body></html>';
         downloadBlob(html, makeBaseName() + '.doc', 'application/msword;charset=utf-8');
         setStatus('Word 已导出。');
       }
@@ -1081,27 +1330,26 @@
 
       function buildReadingDraft() {
         const output = [];
-        let lastChapter = null;
-        let lastQuest = null;
-        let lastScene = null;
         rows.forEach(function (row) {
-          if (row.chapter && row.chapter !== lastChapter) {
-            output.push('# ' + row.chapter);
-            lastChapter = row.chapter;
-            lastQuest = null;
-            lastScene = null;
+          if (row.block_type === 'heading') {
+            output.push('#'.repeat(Math.min(Math.max(Number(row.heading_level) || 1, 1), 6)) + ' ' + row.content);
+          } else if (row.block_type === 'table_row') {
+            const fields = Object.keys(row.dynamic_fields || {}).map(function (field) {
+              return field + '：' + row.dynamic_fields[field];
+            }).join('；');
+            output.push('[' + row.content_id + '] [' + row.category + '] [table_row] ' + (fields || row.content));
+          } else if (row.block_type === 'list_item') {
+            output.push((row.ordered ? '1. ' : '- ') + row.content);
+          } else if (row.block_type === 'quote') {
+            output.push('> ' + String(row.content || '').replace(/\n/g, '\n> '));
+          } else if (row.block_type === 'code_block') {
+            output.push('```\n' + row.content + '\n```');
+          } else if (row.block_type === 'horizontal_rule') {
+            output.push('---');
+          } else {
+            const speaker = row.speaker ? row.speaker + '：' : '';
+            output.push('[' + row.content_id + '] [' + row.category + '] [' + typeTitle(row.type) + '] ' + speaker + row.content);
           }
-          if (row.quest && row.quest !== lastQuest) {
-            output.push('## ' + row.quest);
-            lastQuest = row.quest;
-            lastScene = null;
-          }
-          if (row.scene && row.scene !== lastScene) {
-            output.push('### ' + row.scene);
-            lastScene = row.scene;
-          }
-          const speaker = row.speaker ? row.speaker + '：' : '';
-          output.push('[' + row.content_id + '] [' + row.category + '] [' + typeTitle(row.type) + '] ' + speaker + row.content);
           output.push('');
         });
         return output.join('\n').trim() + '\n';
@@ -1159,7 +1407,14 @@
           player_choice: 'PlayerChoice',
           narration: 'Narration',
           system: 'System',
-          comment: 'Comment'
+          comment: 'Comment',
+          heading: 'Heading',
+          paragraph: 'Paragraph',
+          table_row: 'Table Row',
+          list_item: 'List Item',
+          quote: 'Quote',
+          code_block: 'Code Block',
+          horizontal_rule: 'Horizontal Rule'
         }[type] || type;
       }
 
