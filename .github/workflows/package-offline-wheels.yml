@@ -3,35 +3,44 @@ name: Package offline wheels
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     paths:
       - requirements.txt
+      - .github/workflows/package-offline-wheels.yml
       - install_offline.bat
       - start_pxn_reader.bat
-      - .github/workflows/package-offline-wheels.yml
+      - app.py
+      - narrative_sheet/**
+      - pyproject.toml
 
 jobs:
-  package-offline-wheels:
-    name: Download dependencies and upload offline package
+  package:
     runs-on: windows-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Download requirements for offline install
-        run: python -m pip download -r requirements.txt -d offline_wheels --only-binary=:all:
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
 
-      - name: Verify numpy wheel is included
+      - name: Download wheels
+        run: "python -m pip download -r requirements.txt -d offline_wheels --only-binary=:all:"
+
+      - name: Verify numpy wheel exists
         shell: pwsh
         run: |
-          dir offline_wheels
-          if (-not (Get-ChildItem -Path offline_wheels -Filter "numpy*.whl")) {
-            Write-Error "numpy wheel was not downloaded into offline_wheels"
+          Get-ChildItem offline_wheels
+          $numpy = Get-ChildItem offline_wheels -Filter "numpy*.whl"
+          if (-not $numpy) {
+            Write-Error "numpy wheel was not downloaded"
+            exit 1
           }
 
       - name: Upload offline package
@@ -39,7 +48,13 @@ jobs:
         with:
           name: pxn-reader-offline-windows-python311
           path: |
-            .
-            !.git
-            !.github
-          if-no-files-found: error
+            app.py
+            narrative_sheet/**
+            content/**
+            example/**
+            requirements.txt
+            pyproject.toml
+            README.md
+            offline_wheels/**
+            install_offline.bat
+            start_pxn_reader.bat
