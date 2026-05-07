@@ -234,6 +234,75 @@ storage/
 - `content`
 - `note`
 
+
+## 纯前端版本使用说明
+
+仓库新增单文件网页工具 `PXN-Reader.html`，适合只需要本机双击使用、不能安装 Python、不能启动服务器、不能访问外网的文案整理场景。该版本不会删除或替代现有 Python / Streamlit 版本。
+
+### 使用方式
+
+1. 在文件管理器中双击打开 `PXN-Reader.html`。
+2. 点击 **选择 Markdown 文件**，选择本地 `.md` 文件。
+3. 文件内容会显示在 **Markdown 内容** 区域，也可以直接在该区域粘贴或修改 Markdown。
+4. 点击 **开始解析**。
+5. 在 **解析结果** 表格中检查结构化数据，并按需修改 **分类**。
+6. 根据需要点击：
+   - **导出 Word**：导出可用 Word 打开的 `.doc` 文件。
+   - **导出 Excel**：导出可用 Excel 打开的 `.xls` 文件。
+   - **复制阅读稿**：复制整理后的纯文本阅读稿。
+   - **清空当前文档**：清空当前文件、文本和解析结果。
+
+### 纯前端版本特点
+
+- 不使用 Python。
+- 不使用 Streamlit。
+- 不需要服务器。
+- 不引用外部 CDN、外部字体或外部图片。
+- CSS 和 JavaScript 均内置在 `PXN-Reader.html` 中。
+- 可在公司内网断网环境下打开使用。
+
+### Markdown 解析规则
+
+纯前端版本与现有工具保持相同的标题层级约定：
+
+- `#`：章节 `chapter`
+- `##`：任务 `quest`
+- `###`：场景 `scene`
+
+支持的文本块：
+
+```markdown
+[NPC: 角色名]
+这里是 NPC 对白。
+
+[PlayerChoice]
+1. 玩家选项 A
+2. 玩家选项 B
+
+[Narration]
+这里是旁白。
+
+[System]
+这里是系统提示。
+
+[Comment]
+这里是备注。
+```
+
+解析后会生成以下核心字段：
+
+- `source_file`
+- `chapter`
+- `quest`
+- `scene`
+- `type`
+- `speaker`
+- `content`
+- `char_count`
+- `content_id`
+
+其中 `content_id` 会按解析顺序自动生成，例如 `TXT_000001`、`TXT_000002`。页面还会给出分类建议：主线剧情、支线任务、世界观设定、NPC对白、系统文本、其他，并允许手动修改。
+
 ## 单文件 CLI 用法（保留）
 
 ```bash
