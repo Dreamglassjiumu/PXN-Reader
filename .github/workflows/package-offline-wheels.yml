@@ -1,0 +1,37 @@
+name: Package offline wheels
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - requirements.txt
+      - install_offline.bat
+      - start_pxn_reader.bat
+      - .github/workflows/package-offline-wheels.yml
+
+jobs:
+  package-offline-wheels:
+    name: Download dependencies and upload offline package
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download requirements for offline install
+        run: python -m pip download -r requirements.txt -d offline_wheels
+
+      - name: Upload offline package
+        uses: actions/upload-artifact@v4
+        with:
+          name: pxn-reader-offline-windows-python311
+          path: |
+            .
+            !.git
+            !.github
+          if-no-files-found: error
