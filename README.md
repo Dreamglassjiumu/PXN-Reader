@@ -59,6 +59,48 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+
+## 公司电脑离线安装（已有 Python，但不能访问 PyPI）
+
+如果公司电脑已经安装 Python，但因为不能访问 PyPI 导致 `pip install -r requirements.txt` 失败，可以使用 GitHub Actions 生成的离线依赖包。离线包会包含项目源码、`offline_wheels/` 依赖目录、`install_offline.bat` 和 `start_pxn_reader.bat`。
+
+### 生成并下载离线包
+
+1. 在 GitHub 仓库页面打开 **Actions**。
+2. 选择 **Package offline wheels** 工作流。
+3. 点击 **Run workflow** 手动运行，或在 `requirements.txt` / 离线安装脚本变更后等待自动运行。
+4. 工作流完成后，在运行详情页的 **Artifacts** 区域下载 `pxn-reader-offline-windows-python311`。
+5. 将下载的 artifact 复制到公司电脑，并解压到任意本地目录。
+
+### 在公司电脑安装和启动
+
+1. 双击 `install_offline.bat`。脚本会使用当前电脑已有的 Python 创建 `.venv`，并执行离线安装：
+
+   ```bat
+   py -m venv .venv
+   .venv\Scripts\python.exe -m pip install --no-index --find-links=offline_wheels -r requirements.txt
+   ```
+
+   `--no-index` 会禁止 pip 访问外网，只从解压目录中的 `offline_wheels/` 安装依赖。
+
+2. 安装完成后，双击 `start_pxn_reader.bat` 启动 Streamlit 应用。脚本会执行：
+
+   ```bat
+   .venv\Scripts\python.exe -m streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+   ```
+
+3. 本机浏览器访问：
+
+   ```text
+   http://localhost:8501
+   ```
+
+4. 同事在同一公司内网中访问：
+
+   ```text
+   http://你的内网IP:8501
+   ```
+
 ## 如何本地启动
 
 在仓库根目录执行：
