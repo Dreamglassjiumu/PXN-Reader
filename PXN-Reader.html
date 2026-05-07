@@ -403,6 +403,94 @@
         rgba(8, 9, 10, 0.52);
     }
 
+
+
+    .recommend-panel {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+      padding: 14px;
+      border: 1px solid rgba(185, 148, 77, 0.34);
+      border-radius: 14px;
+      background: rgba(8, 9, 10, 0.34);
+    }
+
+    .recommend-field label {
+      display: block;
+      margin-bottom: 7px;
+      color: #f3d891;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .recommend-field select { width: 100%; }
+
+    .recommend-reason {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--ink-soft);
+      line-height: 1.65;
+    }
+
+    .preview-toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .preview-toolbar button {
+      width: auto;
+      min-width: 120px;
+      padding: 10px 12px;
+    }
+
+    button.is-active, button.recommended {
+      border-color: var(--brass-soft);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 42%),
+        linear-gradient(180deg, #7a2730, #431319);
+    }
+
+    button.deemphasized { opacity: 0.66; }
+
+    .word-preview {
+      max-height: 620px;
+      overflow: auto;
+      padding: 22px;
+      border: 1px solid rgba(185, 148, 77, 0.46);
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at 18% 0, rgba(209, 177, 112, 0.08), transparent 16rem),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.32)),
+        rgba(10, 11, 12, 0.72);
+      box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.20);
+      color: #efe6d0;
+      font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+      line-height: 1.75;
+    }
+
+    .word-preview h1 {
+      display: block;
+      margin: 0 0 14px;
+      padding: 0 0 8px;
+      border-bottom: 1px solid rgba(209, 177, 112, 0.38);
+      font-size: 24px;
+      letter-spacing: 0.02em;
+    }
+
+    .word-preview h1::after { content: none; }
+    .word-preview h2 { margin: 18px 0 10px; color: #f2dfb2; font-size: 20px; }
+    .word-preview h3 { margin: 14px 0 8px; color: #d8ba74; font-size: 17px; }
+    .word-preview p { margin: 8px 0; }
+    .word-preview .category { color: var(--muted); font-size: 12px; }
+
+    @media (max-width: 720px) {
+      .recommend-panel { grid-template-columns: 1fr; }
+      .preview-toolbar { flex-direction: column; }
+      .preview-toolbar button { width: 100%; }
+    }
+
     .status {
       min-height: 22px;
       margin-top: 14px;
@@ -465,10 +553,26 @@
 
         <section class="card section">
           <div class="section-title">
-            <h2>解析结果</h2>
+            <h2>导出前预览</h2>
             <span class="hint">分类可以手动修改</span>
           </div>
+          <div id="recommendPanel" class="recommend-panel" hidden>
+            <div class="recommend-field">
+              <label for="docTypeSelect">文档类型建议</label>
+              <select id="docTypeSelect"></select>
+            </div>
+            <div class="recommend-field">
+              <label for="exportModeSelect">导出方式建议</label>
+              <select id="exportModeSelect"></select>
+            </div>
+            <p id="recommendReason" class="recommend-reason"></p>
+          </div>
+          <div id="previewToolbar" class="preview-toolbar" hidden>
+            <button id="wordPreviewBtn" class="secondary" type="button">Word 预览</button>
+            <button id="excelPreviewBtn" class="secondary" type="button">Excel 预览</button>
+          </div>
           <div id="emptyState" class="empty">暂无解析结果。请选择文件后点击“开始解析”。</div>
+          <div id="wordPreview" class="word-preview" hidden></div>
           <div id="tableWrap" class="table-wrap" hidden>
             <table id="previewTable">
               <thead>
@@ -498,6 +602,17 @@
       'use strict';
 
       const CATEGORY_OPTIONS = ['主线剧情', '支线任务', '世界观设定', 'NPC对白', '系统文本', '其他'];
+      const DOCUMENT_TYPE_OPTIONS = ['剧情文案', 'NPC对白', '世界观设定', '需求说明', '系统文本', '配置文案', '其他'];
+      const EXPORT_MODE_OPTIONS = ['Word', 'Excel', 'Word 和 Excel'];
+      const EXPORT_MODE_BY_DOCUMENT_TYPE = {
+        '剧情文案': 'Word',
+        'NPC对白': 'Excel',
+        '世界观设定': 'Word',
+        '需求说明': 'Excel',
+        '系统文本': 'Excel',
+        '配置文案': 'Excel',
+        '其他': 'Word 和 Excel'
+      };
       const TYPE_LABELS = {
         PlayerChoice: 'player_choice',
         Narration: 'narration',
@@ -520,12 +635,23 @@
         chapterCount: document.getElementById('chapterCount'),
         sceneCount: document.getElementById('sceneCount'),
         emptyState: document.getElementById('emptyState'),
+        recommendPanel: document.getElementById('recommendPanel'),
+        docTypeSelect: document.getElementById('docTypeSelect'),
+        exportModeSelect: document.getElementById('exportModeSelect'),
+        recommendReason: document.getElementById('recommendReason'),
+        previewToolbar: document.getElementById('previewToolbar'),
+        wordPreviewBtn: document.getElementById('wordPreviewBtn'),
+        excelPreviewBtn: document.getElementById('excelPreviewBtn'),
+        wordPreview: document.getElementById('wordPreview'),
         tableWrap: document.getElementById('tableWrap'),
         tableBody: document.querySelector('#previewTable tbody')
       };
 
       let currentFileName = '';
       let rows = [];
+      let currentAnalysis = null;
+      let exportModeTouched = false;
+      let previewMode = 'excel';
 
       els.file.addEventListener('change', handleFileChange);
       els.parseBtn.addEventListener('click', parseCurrentText);
@@ -533,6 +659,16 @@
       els.exportExcelBtn.addEventListener('click', exportExcel);
       els.copyBtn.addEventListener('click', copyReadingDraft);
       els.clearBtn.addEventListener('click', clearDocument);
+      els.docTypeSelect.addEventListener('change', handleDocumentTypeChange);
+      els.exportModeSelect.addEventListener('change', function () {
+        exportModeTouched = true;
+        updateExportButtonStyle();
+      });
+      els.wordPreviewBtn.addEventListener('click', function () { setPreviewMode('word'); });
+      els.excelPreviewBtn.addEventListener('click', function () { setPreviewMode('excel'); });
+
+      fillSelect(els.docTypeSelect, DOCUMENT_TYPE_OPTIONS);
+      fillSelect(els.exportModeSelect, EXPORT_MODE_OPTIONS);
 
       function handleFileChange(event) {
         const file = event.target.files && event.target.files[0];
@@ -563,7 +699,10 @@
           return;
         }
         rows = parseMarkdown(text, currentFileName || '未命名.md');
-        renderTable();
+        currentAnalysis = analyzeDocument(text, rows);
+        exportModeTouched = false;
+        applyAnalysisDefaults();
+        renderPreviews();
         updateStats();
         setExportState(rows.length > 0);
         setStatus(rows.length ? '解析完成。' : '没有识别到支持的文本块。', rows.length === 0);
@@ -654,6 +793,98 @@
         return '其他';
       }
 
+      function analyzeDocument(text, parsedRows) {
+        const source = String(text || '').replace(/\r\n/g, '\n');
+        const stats = {
+          npcTags: (source.match(/\[NPC:\s*[^\]]+\]/g) || []).length,
+          narrationTags: (source.match(/\[Narration\]/g) || []).length,
+          choiceTags: (source.match(/\[PlayerChoice\]/g) || []).length,
+          systemTags: (source.match(/\[System\]/g) || []).length,
+          chapters: (source.match(/^#\s+/gm) || []).length,
+          scenes: (source.match(/^###\s+/gm) || []).length,
+          tables: (source.match(/^\s*\|.*\|\s*$/gm) || []).length,
+          lists: (source.match(/^\s*(?:[-*+]|\d+\.)\s+/gm) || []).length,
+          worldKeywords: countKeywordMatches(source, ['世界观', '设定', '背景', '历史', '阵营', '地理', '种族', '宗教', '纪元']),
+          requirementKeywords: countKeywordMatches(source, ['需求', '功能', '规则', '流程', '状态', '优先级', '验收', '交互', 'UI']),
+          configKeywords: countKeywordMatches(source, ['配置', '字段', '参数', '数值', '条件', '触发']),
+          systemKeywords: countKeywordMatches(source, ['提示', '按钮', '弹窗', '报错', 'UI文本', '系统提示'])
+        };
+        const shortNpcRows = parsedRows.filter(function (row) {
+          return row.type === 'npc' && row.char_count > 0 && row.char_count <= 36;
+        }).length;
+        const rowCount = parsedRows.length || 1;
+        const storyScore = stats.npcTags + stats.narrationTags + stats.choiceTags + stats.chapters + stats.scenes;
+        const npcScore = stats.npcTags * 2 + shortNpcRows;
+        const worldScore = stats.worldKeywords;
+        const configScore = stats.configKeywords + stats.tables + Math.floor(stats.lists / 2);
+        const requirementScore = stats.requirementKeywords + stats.tables + Math.floor(stats.lists / 2);
+        const systemScore = stats.systemTags * 2 + stats.systemKeywords;
+
+        let documentType = '其他';
+        let reason = '文档类型不太明确，建议同时查看 Word 预览和 Excel 预览。';
+        if (systemScore >= 4 || (stats.systemTags >= 2 && systemScore >= 2)) {
+          documentType = '系统文本';
+          reason = '检测到较多系统文本、提示、按钮或弹窗内容，建议导出为 Excel，方便筛选和检查。';
+        } else if (npcScore >= 8 || (stats.npcTags >= 4 && shortNpcRows / rowCount >= 0.45)) {
+          documentType = 'NPC对白';
+          reason = '检测到较多 NPC 标签和短对白，建议导出为 Excel，方便按角色和场景审阅。';
+        } else if (storyScore >= 5 && (stats.chapters || stats.scenes || stats.narrationTags || stats.choiceTags)) {
+          documentType = '剧情文案';
+          reason = '检测到章节、场景和对白内容，建议导出为 Word，方便连续阅读。';
+        } else if (worldScore >= 3) {
+          documentType = '世界观设定';
+          reason = '检测到较多世界观、背景、历史或阵营关键词，建议导出为 Word，方便按段落阅读。';
+        } else if (configScore >= 4 && stats.configKeywords >= stats.requirementKeywords) {
+          documentType = '配置文案';
+          reason = '检测到较多配置、字段、参数或表格内容，建议导出为 Excel，方便核对字段。';
+        } else if (requirementScore >= 4) {
+          documentType = '需求说明';
+          reason = '检测到较多列表、表格和需求关键词，建议导出为 Excel，方便筛选和审阅。';
+        }
+
+        return {
+          documentType: documentType,
+          exportMode: EXPORT_MODE_BY_DOCUMENT_TYPE[documentType],
+          reason: reason
+        };
+      }
+
+      function countKeywordMatches(text, keywords) {
+        return keywords.reduce(function (sum, keyword) {
+          const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          return sum + (String(text || '').match(new RegExp(escaped, 'gi')) || []).length;
+        }, 0);
+      }
+
+      function applyAnalysisDefaults() {
+        if (!currentAnalysis || !rows.length) return;
+        els.docTypeSelect.value = currentAnalysis.documentType;
+        els.exportModeSelect.value = currentAnalysis.exportMode;
+        els.recommendReason.textContent = '文档类型建议：' + currentAnalysis.documentType + '。导出方式建议：' + currentAnalysis.exportMode + '。' + currentAnalysis.reason;
+        setPreviewMode(currentAnalysis.exportMode === 'Word' ? 'word' : 'excel', true);
+      }
+
+      function handleDocumentTypeChange() {
+        const selectedType = els.docTypeSelect.value;
+        const nextExportMode = EXPORT_MODE_BY_DOCUMENT_TYPE[selectedType] || 'Word 和 Excel';
+        if (!exportModeTouched) {
+          els.exportModeSelect.value = nextExportMode;
+        }
+        currentAnalysis = {
+          documentType: selectedType,
+          exportMode: nextExportMode,
+          reason: makeManualTypeReason(selectedType, nextExportMode)
+        };
+        els.recommendReason.textContent = '文档类型建议：' + selectedType + '。导出方式建议：' + els.exportModeSelect.value + '。' + currentAnalysis.reason;
+        updateExportButtonStyle();
+      }
+
+      function makeManualTypeReason(documentType, exportMode) {
+        if (documentType === '其他') return '文档类型不太明确，建议同时查看 Word 预览和 Excel 预览。';
+        if (exportMode === 'Word') return '当前文档类型更适合连续阅读，建议优先查看 Word 预览。';
+        return '当前文档类型更适合按字段检查，建议优先查看 Excel 预览。';
+      }
+
       function renderTable() {
         els.tableBody.textContent = '';
         rows.forEach(function (row, index) {
@@ -672,6 +903,7 @@
           });
           select.addEventListener('change', function () {
             rows[index].category = select.value;
+            renderWordPreview();
             setStatus('分类已更新。');
           });
           categoryCell.appendChild(select);
@@ -689,7 +921,7 @@
         });
 
         els.emptyState.hidden = rows.length > 0;
-        els.tableWrap.hidden = rows.length === 0;
+        els.tableWrap.hidden = rows.length === 0 || previewMode !== 'excel';
       }
 
       function appendCell(tr, value, className) {
@@ -699,10 +931,55 @@
         tr.appendChild(td);
       }
 
+      function renderPreviews() {
+        renderTable();
+        renderWordPreview();
+        els.recommendPanel.hidden = rows.length === 0;
+        els.previewToolbar.hidden = rows.length === 0;
+        updateExportButtonStyle();
+      }
+
+      function renderWordPreview() {
+        els.wordPreview.innerHTML = rows.length ? buildWordSectionsHtml() : '';
+        els.wordPreview.hidden = rows.length === 0 || previewMode !== 'word';
+      }
+
+      function setPreviewMode(mode, silent) {
+        previewMode = mode === 'word' ? 'word' : 'excel';
+        els.wordPreview.hidden = rows.length === 0 || previewMode !== 'word';
+        els.tableWrap.hidden = rows.length === 0 || previewMode !== 'excel';
+        els.wordPreviewBtn.classList.toggle('is-active', previewMode === 'word');
+        els.excelPreviewBtn.classList.toggle('is-active', previewMode === 'excel');
+        if (!silent && rows.length) {
+          setStatus(previewMode === 'word' ? '已切换到 Word 预览。' : '已切换到 Excel 预览。');
+        }
+      }
+
+      function updateExportButtonStyle() {
+        const mode = els.exportModeSelect.value || 'Word 和 Excel';
+        els.exportWordBtn.classList.toggle('recommended', mode === 'Word' || mode === 'Word 和 Excel');
+        els.exportExcelBtn.classList.toggle('recommended', mode === 'Excel' || mode === 'Word 和 Excel');
+        els.exportWordBtn.classList.toggle('deemphasized', mode === 'Excel');
+        els.exportExcelBtn.classList.toggle('deemphasized', mode === 'Word');
+      }
+
+      function fillSelect(select, options) {
+        options.forEach(function (value) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = value;
+          select.appendChild(option);
+        });
+      }
+
       function exportExcel() {
-        if (!rows.length) return;
-        const fields = ['source_file', 'chapter', 'quest', 'scene', 'type', 'speaker', 'content', 'char_count', 'content_id', 'category'];
-        const tableRows = [fields].concat(rows.map(function (row) {
+        if (!rows.length) {
+          setStatus('当前没有解析结果，不能导出 Excel。', true);
+          return;
+        }
+        const fields = ['content_id', 'category', 'source_file', 'chapter', 'quest', 'scene', 'type', 'speaker', 'content', 'char_count'];
+        const headers = ['content_id', '分类', 'source_file', 'chapter', 'quest', 'scene', 'type', 'speaker', 'content', 'char_count'];
+        const tableRows = [headers].concat(rows.map(function (row) {
           return fields.map(function (field) { return row[field]; });
         }));
         const tableHtml = tableRows.map(function (cells, rowIndex) {
@@ -716,8 +993,7 @@
         setStatus('Excel 已导出。');
       }
 
-      function exportWord() {
-        if (!rows.length) return;
+      function buildWordSectionsHtml() {
         const sections = [];
         let lastChapter = null;
         let lastQuest = null;
@@ -738,11 +1014,36 @@
             sections.push('<h3>' + escapeHtml(row.scene) + '</h3>');
             lastScene = row.scene;
           }
-          const label = typeTitle(row.type);
-          const speaker = row.speaker ? ' ' + escapeHtml(row.speaker) + '：' : ' ';
-          sections.push('<p><strong>[' + escapeHtml(label) + ']</strong>' + speaker + escapeHtml(row.content).replace(/\n/g, '<br>') + '</p>');
+          sections.push(formatWordRow(row));
         });
-        const html = '\ufeff<html><head><meta charset="utf-8"><title>PXN-Reader Word</title><style>body{font-family:"Microsoft YaHei",serif;line-height:1.7}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}p{margin:8px 0}</style></head><body>' + sections.join('\n') + '</body></html>';
+        return sections.join('\n');
+      }
+
+      function formatWordRow(row) {
+        const content = escapeHtml(row.content).replace(/\n/g, '<br>');
+        const category = ' <span class="category">（分类：' + escapeHtml(row.category) + '）</span>';
+        if (row.type === 'narration') return '<p><strong>【旁白】</strong>' + content + category + '</p>';
+        if (row.type === 'npc') return '<p><strong>【' + escapeHtml(row.speaker || 'NPC') + '】</strong>' + content + category + '</p>';
+        if (row.type === 'player_choice') return '<div><strong>【玩家选项】</strong>' + category + buildChoiceList(row.content) + '</div>';
+        if (row.type === 'system') return '<p><strong>【系统文本】</strong>' + content + category + '</p>';
+        if (row.type === 'comment') return '<p><strong>【策划备注】</strong>' + content + category + '</p>';
+        return '<p>' + content + category + '</p>';
+      }
+
+      function buildChoiceList(content) {
+        const choices = String(content || '').split(/\n+/).map(function (line) { return line.trim(); }).filter(Boolean);
+        if (!choices.length) return '';
+        return '<ol>' + choices.map(function (choice) {
+          return '<li>' + escapeHtml(choice.replace(/^\d+[.、]\s*/, '')) + '</li>';
+        }).join('') + '</ol>';
+      }
+
+      function exportWord() {
+        if (!rows.length) {
+          setStatus('当前没有解析结果，不能导出 Word。', true);
+          return;
+        }
+        const html = '\ufeff<html><head><meta charset="utf-8"><title>PXN-Reader Word</title><style>body{font-family:"Microsoft YaHei",serif;line-height:1.7}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}p{margin:8px 0}.category{color:#666;font-size:12px}</style></head><body>' + buildWordSectionsHtml() + '</body></html>';
         downloadBlob(html, makeBaseName() + '.doc', 'application/msword;charset=utf-8');
         setStatus('Word 已导出。');
       }
@@ -809,10 +1110,13 @@
       function clearDocument() {
         currentFileName = '';
         rows = [];
+        currentAnalysis = null;
+        exportModeTouched = false;
+        previewMode = 'excel';
         els.file.value = '';
         els.fileInfo.textContent = '尚未选择文件。';
         els.markdownText.value = '';
-        renderTable();
+        renderPreviews();
         updateStats();
         setExportState(false);
         setStatus('当前文档已清空。');
@@ -832,6 +1136,12 @@
         els.exportWordBtn.disabled = !enabled;
         els.exportExcelBtn.disabled = !enabled;
         els.copyBtn.disabled = !enabled;
+        if (!enabled) {
+          els.exportWordBtn.classList.remove('recommended', 'deemphasized');
+          els.exportExcelBtn.classList.remove('recommended', 'deemphasized');
+        } else {
+          updateExportButtonStyle();
+        }
       }
 
       function setStatus(message, isError) {
