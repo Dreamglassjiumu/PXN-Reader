@@ -1,3 +1,7 @@
+from pathlib import Path
+import subprocess
+import sys
+
 from narrative_sheet.parser import MarkdownParseError, parse_markdown, parse_markdown_file
 
 
@@ -61,3 +65,31 @@ def test_parse_markdown_file_rejects_non_markdown(tmp_path):
         assert "Only .md files" in str(exc)
     else:
         raise AssertionError("Expected MarkdownParseError")
+
+
+def test_cli_generates_xlsx_and_docx(tmp_path):
+    input_path = Path("example/sample.md")
+    xlsx_path = tmp_path / "output.xlsx"
+    docx_path = tmp_path / "output.docx"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "narrative_sheet",
+            str(input_path),
+            "--xlsx",
+            str(xlsx_path),
+            "--docx",
+            str(docx_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert xlsx_path.is_file()
+    assert xlsx_path.stat().st_size > 0
+    assert docx_path.is_file()
+    assert docx_path.stat().st_size > 0

@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Local CLI smoke-test artifacts
+output.xlsx
+output.docx
