@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PXN-Reader 纯前端版本</title>
+  <style>
+    :root {
+      --paper: #f3e3bd;
+      --paper-deep: #e3c989;
+      --wood: #3b2417;
+      --wood-soft: #5b3824;
+      --ink: #2a1b12;
+      --muted: #6f573c;
+      --gold: #b9892c;
+      --gold-deep: #7f5a18;
+      --line: #9b7438;
+      --danger: #7a2525;
+      --white: #fff8e8;
+      --shadow: rgba(26, 13, 5, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", "Microsoft YaHei", "微软雅黑", serif;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255, 237, 184, 0.18), transparent 26rem),
+        linear-gradient(90deg, rgba(50, 29, 18, 0.88), rgba(30, 17, 11, 0.94)),
+        repeating-linear-gradient(90deg, #2f1c12 0, #2f1c12 22px, #3b2417 22px, #3b2417 44px);
+    }
+
+    .page {
+      width: min(1380px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 40px;
+    }
+
+    header {
+      padding: 24px;
+      border: 2px solid var(--gold);
+      border-radius: 18px;
+      background:
+        linear-gradient(135deg, rgba(255, 248, 232, 0.96), rgba(231, 203, 137, 0.93)),
+        var(--paper);
+      box-shadow: 0 18px 40px var(--shadow), inset 0 0 0 6px rgba(127, 90, 24, 0.12);
+    }
+
+    h1, h2, h3 { margin: 0; }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: 0.04em;
+    }
+
+    header p {
+      max-width: 920px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .card {
+      border: 2px solid var(--line);
+      border-radius: 16px;
+      background:
+        linear-gradient(145deg, rgba(255, 248, 232, 0.96), rgba(239, 218, 171, 0.96)),
+        var(--paper);
+      box-shadow: 0 14px 34px var(--shadow), inset 0 0 0 5px rgba(127, 90, 24, 0.08);
+    }
+
+    .sidebar {
+      padding: 18px;
+      align-self: start;
+      position: sticky;
+      top: 16px;
+    }
+
+    .main { min-width: 0; }
+
+    .section { padding: 18px; margin-bottom: 18px; }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(127, 90, 24, 0.35);
+    }
+
+    .section-title h2 { font-size: 20px; }
+
+    .hint {
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .file-input {
+      display: block;
+      width: 100%;
+      margin: 10px 0 14px;
+      padding: 12px;
+      color: var(--ink);
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      background: rgba(255, 248, 232, 0.72);
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button, .file-label {
+      width: 100%;
+      border: 1px solid var(--gold-deep);
+      border-radius: 12px;
+      padding: 11px 12px;
+      color: var(--white);
+      background: linear-gradient(180deg, var(--wood-soft), var(--wood));
+      box-shadow: 0 3px 0 #24140d;
+      cursor: pointer;
+      font: 700 15px/1.2 "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+      text-align: center;
+    }
+
+    button:hover, .file-label:hover { filter: brightness(1.08); }
+    button:active, .file-label:active { transform: translateY(2px); box-shadow: 0 1px 0 #24140d; }
+    button:disabled { cursor: not-allowed; opacity: 0.48; filter: grayscale(0.5); }
+    button.secondary { background: linear-gradient(180deg, #8f6828, #644416); }
+    button.danger { background: linear-gradient(180deg, #8c3531, var(--danger)); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .stat {
+      padding: 10px;
+      border: 1px solid rgba(127, 90, 24, 0.35);
+      border-radius: 12px;
+      background: rgba(255, 248, 232, 0.55);
+    }
+
+    .stat strong { display: block; font-size: 20px; }
+    .stat span { color: var(--muted); font-size: 13px; }
+
+    textarea {
+      width: 100%;
+      min-height: 260px;
+      resize: vertical;
+      padding: 14px;
+      color: var(--ink);
+      border: 1px solid rgba(127, 90, 24, 0.55);
+      border-radius: 12px;
+      background: rgba(255, 248, 232, 0.82);
+      font: 14px/1.6 Consolas, "Microsoft YaHei", monospace;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 620px;
+      border: 1px solid rgba(127, 90, 24, 0.48);
+      border-radius: 12px;
+      background: rgba(255, 248, 232, 0.58);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1220px;
+      font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+      font-size: 13px;
+    }
+
+    th, td {
+      border-bottom: 1px solid rgba(127, 90, 24, 0.24);
+      border-right: 1px solid rgba(127, 90, 24, 0.18);
+      padding: 9px 10px;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      color: var(--white);
+      background: linear-gradient(180deg, var(--wood-soft), var(--wood));
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    td { background: rgba(255, 248, 232, 0.72); }
+    tr:nth-child(even) td { background: rgba(239, 218, 171, 0.42); }
+
+    select {
+      min-width: 120px;
+      padding: 7px 8px;
+      border: 1px solid rgba(127, 90, 24, 0.55);
+      border-radius: 9px;
+      color: var(--ink);
+      background: var(--white);
+    }
+
+    .content-cell {
+      max-width: 360px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .empty {
+      padding: 30px;
+      color: var(--muted);
+      text-align: center;
+      border: 1px dashed rgba(127, 90, 24, 0.5);
+      border-radius: 12px;
+      background: rgba(255, 248, 232, 0.45);
+    }
+
+    .status {
+      min-height: 22px;
+      margin-top: 12px;
+      color: var(--gold-deep);
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .error { color: var(--danger); }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>PXN-Reader 纯前端版本</h1>
+      <p>双击打开此 HTML 文件即可使用。工具只读取本地 Markdown 文件，并在浏览器内完成解析、预览、分类、复制和导出，不需要 Python、Streamlit、服务器或外部网络。</p>
+    </header>
+
+    <div class="layout">
+      <aside class="card sidebar">
+        <div class="section-title">
+          <h2>文件预览</h2>
+        </div>
+        <label for="mdFile" class="file-label">选择 Markdown 文件</label>
+        <input id="mdFile" class="file-input" type="file" accept=".md,text/markdown,text/plain">
+        <p class="hint" id="fileInfo">尚未选择文件。</p>
+
+        <div class="stats" aria-live="polite">
+          <div class="stat"><strong id="rowCount">0</strong><span>文本行</span></div>
+          <div class="stat"><strong id="charCount">0</strong><span>总字数</span></div>
+          <div class="stat"><strong id="chapterCount">0</strong><span>章节</span></div>
+          <div class="stat"><strong id="sceneCount">0</strong><span>场景</span></div>
+        </div>
+
+        <div class="button-grid">
+          <button id="parseBtn">开始解析</button>
+          <button id="exportWordBtn" class="secondary" disabled>导出 Word</button>
+          <button id="exportExcelBtn" class="secondary" disabled>导出 Excel</button>
+          <button id="copyBtn" class="secondary" disabled>复制阅读稿</button>
+          <button id="clearBtn" class="danger">清空当前文档</button>
+        </div>
+        <div id="status" class="status" role="status"></div>
+      </aside>
+
+      <main class="main">
+        <section class="card section">
+          <div class="section-title">
+            <h2>Markdown 内容</h2>
+          </div>
+          <textarea id="markdownText" placeholder="请选择 Markdown 文件，或直接在这里粘贴 Markdown 内容。"></textarea>
+          <p class="hint">识别规则：# 作为章节，## 作为任务，### 作为场景；支持 [NPC: 角色名]、[PlayerChoice]、[Narration]、[System]、[Comment]。</p>
+        </section>
+
+        <section class="card section">
+          <div class="section-title">
+            <h2>解析结果</h2>
+            <span class="hint">分类可以手动修改</span>
+          </div>
+          <div id="emptyState" class="empty">暂无解析结果。请选择文件后点击“开始解析”。</div>
+          <div id="tableWrap" class="table-wrap" hidden>
+            <table id="previewTable">
+              <thead>
+                <tr>
+                  <th>content_id</th>
+                  <th>分类</th>
+                  <th>source_file</th>
+                  <th>chapter</th>
+                  <th>quest</th>
+                  <th>scene</th>
+                  <th>type</th>
+                  <th>speaker</th>
+                  <th>content</th>
+                  <th>char_count</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const CATEGORY_OPTIONS = ['主线剧情', '支线任务', '世界观设定', 'NPC对白', '系统文本', '其他'];
+      const TYPE_LABELS = {
+        PlayerChoice: 'player_choice',
+        Narration: 'narration',
+        System: 'system',
+        Comment: 'comment'
+      };
+
+      const els = {
+        file: document.getElementById('mdFile'),
+        fileInfo: document.getElementById('fileInfo'),
+        markdownText: document.getElementById('markdownText'),
+        parseBtn: document.getElementById('parseBtn'),
+        exportWordBtn: document.getElementById('exportWordBtn'),
+        exportExcelBtn: document.getElementById('exportExcelBtn'),
+        copyBtn: document.getElementById('copyBtn'),
+        clearBtn: document.getElementById('clearBtn'),
+        status: document.getElementById('status'),
+        rowCount: document.getElementById('rowCount'),
+        charCount: document.getElementById('charCount'),
+        chapterCount: document.getElementById('chapterCount'),
+        sceneCount: document.getElementById('sceneCount'),
+        emptyState: document.getElementById('emptyState'),
+        tableWrap: document.getElementById('tableWrap'),
+        tableBody: document.querySelector('#previewTable tbody')
+      };
+
+      let currentFileName = '';
+      let rows = [];
+
+      els.file.addEventListener('change', handleFileChange);
+      els.parseBtn.addEventListener('click', parseCurrentText);
+      els.exportWordBtn.addEventListener('click', exportWord);
+      els.exportExcelBtn.addEventListener('click', exportExcel);
+      els.copyBtn.addEventListener('click', copyReadingDraft);
+      els.clearBtn.addEventListener('click', clearDocument);
+
+      function handleFileChange(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.md')) {
+          setStatus('请选择 .md 文件。', true);
+          event.target.value = '';
+          return;
+        }
+
+        currentFileName = file.name;
+        const reader = new FileReader();
+        reader.onload = function () {
+          els.markdownText.value = String(reader.result || '');
+          els.fileInfo.textContent = file.name + '（' + formatBytes(file.size) + '）';
+          setStatus('文件已读取，请点击“开始解析”。');
+        };
+        reader.onerror = function () {
+          setStatus('文件读取失败，请重试。', true);
+        };
+        reader.readAsText(file, 'utf-8');
+      }
+
+      function parseCurrentText() {
+        const text = els.markdownText.value || '';
+        if (!text.trim()) {
+          setStatus('没有可解析的 Markdown 内容。', true);
+          return;
+        }
+        rows = parseMarkdown(text, currentFileName || '未命名.md');
+        renderTable();
+        updateStats();
+        setExportState(rows.length > 0);
+        setStatus(rows.length ? '解析完成。' : '没有识别到支持的文本块。', rows.length === 0);
+      }
+
+      function parseMarkdown(text, sourceFile) {
+        const parsed = [];
+        let chapter = '';
+        let quest = '';
+        let scene = '';
+        let current = null;
+        const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+        lines.forEach(function (rawLine) {
+          const line = rawLine.replace(/\s+$/, '');
+          const stripped = line.trim();
+          const heading = stripped.match(/^(#{1,3})\s+(.+?)\s*$/);
+          if (heading) {
+            flushCurrent();
+            const level = heading[1].length;
+            const title = heading[2].trim();
+            if (level === 1) {
+              chapter = title;
+              quest = '';
+              scene = '';
+            } else if (level === 2) {
+              quest = title;
+              scene = '';
+            } else {
+              scene = title;
+            }
+            return;
+          }
+
+          const block = stripped.match(/^\[(NPC:\s*([^\]]+)|PlayerChoice|Narration|System|Comment)\]\s*(.*)$/);
+          if (block) {
+            flushCurrent();
+            const token = block[1];
+            const inline = (block[3] || '').trim();
+            if (token.indexOf('NPC:') === 0) {
+              current = { chapter, quest, scene, type: 'npc', speaker: (block[2] || '').trim(), lines: inline ? [inline] : [] };
+            } else {
+              current = { chapter, quest, scene, type: TYPE_LABELS[token], speaker: '', lines: inline ? [inline] : [] };
+            }
+            return;
+          }
+
+          if (current) {
+            if (stripped) {
+              current.lines.push(stripped);
+            } else {
+              flushCurrent();
+            }
+          }
+        });
+        flushCurrent();
+
+        return parsed.map(function (row, index) {
+          row.content_id = 'TXT_' + String(index + 1).padStart(6, '0');
+          row.char_count = countCharacters(row.content);
+          row.category = suggestCategory(row);
+          return row;
+        });
+
+        function flushCurrent() {
+          if (!current) return;
+          const content = current.lines.join('\n').trim();
+          parsed.push({
+            source_file: sourceFile,
+            chapter: current.chapter,
+            quest: current.quest,
+            scene: current.scene,
+            type: current.type,
+            speaker: current.speaker,
+            content: content
+          });
+          current = null;
+        }
+      }
+
+      function suggestCategory(row) {
+        const haystack = [row.chapter, row.quest, row.scene, row.content].join(' ').toLowerCase();
+        if (row.type === 'system') return '系统文本';
+        if (row.type === 'npc') return 'NPC对白';
+        if (/支线|side|branch|optional/.test(haystack)) return '支线任务';
+        if (/世界观|设定|背景|历史|地理|lore|world/.test(haystack)) return '世界观设定';
+        if (/主线|main|story|剧情/.test(haystack)) return '主线剧情';
+        return '其他';
+      }
+
+      function renderTable() {
+        els.tableBody.textContent = '';
+        rows.forEach(function (row, index) {
+          const tr = document.createElement('tr');
+          appendCell(tr, row.content_id);
+
+          const categoryCell = document.createElement('td');
+          const select = document.createElement('select');
+          select.setAttribute('aria-label', '分类');
+          CATEGORY_OPTIONS.forEach(function (category) {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            option.selected = category === row.category;
+            select.appendChild(option);
+          });
+          select.addEventListener('change', function () {
+            rows[index].category = select.value;
+            setStatus('分类已更新。');
+          });
+          categoryCell.appendChild(select);
+          tr.appendChild(categoryCell);
+
+          appendCell(tr, row.source_file);
+          appendCell(tr, row.chapter);
+          appendCell(tr, row.quest);
+          appendCell(tr, row.scene);
+          appendCell(tr, row.type);
+          appendCell(tr, row.speaker);
+          appendCell(tr, row.content, 'content-cell');
+          appendCell(tr, row.char_count);
+          els.tableBody.appendChild(tr);
+        });
+
+        els.emptyState.hidden = rows.length > 0;
+        els.tableWrap.hidden = rows.length === 0;
+      }
+
+      function appendCell(tr, value, className) {
+        const td = document.createElement('td');
+        td.textContent = value == null ? '' : String(value);
+        if (className) td.className = className;
+        tr.appendChild(td);
+      }
+
+      function exportExcel() {
+        if (!rows.length) return;
+        const fields = ['source_file', 'chapter', 'quest', 'scene', 'type', 'speaker', 'content', 'char_count', 'content_id', 'category'];
+        const tableRows = [fields].concat(rows.map(function (row) {
+          return fields.map(function (field) { return row[field]; });
+        }));
+        const tableHtml = tableRows.map(function (cells, rowIndex) {
+          const tag = rowIndex === 0 ? 'th' : 'td';
+          return '<tr>' + cells.map(function (cell) {
+            return '<' + tag + '>' + escapeHtml(cell == null ? '' : String(cell)).replace(/\n/g, '<br>') + '</' + tag + '>';
+          }).join('') + '</tr>';
+        }).join('');
+        const html = '\ufeff<html><head><meta charset="utf-8"><style>table{border-collapse:collapse}td,th{border:1px solid #999;padding:6px;vertical-align:top}th{font-weight:bold;background:#eee}</style></head><body><table>' + tableHtml + '</table></body></html>';
+        downloadBlob(html, makeBaseName() + '.xls', 'application/vnd.ms-excel;charset=utf-8');
+        setStatus('Excel 已导出。');
+      }
+
+      function exportWord() {
+        if (!rows.length) return;
+        const sections = [];
+        let lastChapter = null;
+        let lastQuest = null;
+        let lastScene = null;
+        rows.forEach(function (row) {
+          if (row.chapter && row.chapter !== lastChapter) {
+            sections.push('<h1>' + escapeHtml(row.chapter) + '</h1>');
+            lastChapter = row.chapter;
+            lastQuest = null;
+            lastScene = null;
+          }
+          if (row.quest && row.quest !== lastQuest) {
+            sections.push('<h2>' + escapeHtml(row.quest) + '</h2>');
+            lastQuest = row.quest;
+            lastScene = null;
+          }
+          if (row.scene && row.scene !== lastScene) {
+            sections.push('<h3>' + escapeHtml(row.scene) + '</h3>');
+            lastScene = row.scene;
+          }
+          const label = typeTitle(row.type);
+          const speaker = row.speaker ? ' ' + escapeHtml(row.speaker) + '：' : ' ';
+          sections.push('<p><strong>[' + escapeHtml(label) + ']</strong>' + speaker + escapeHtml(row.content).replace(/\n/g, '<br>') + '</p>');
+        });
+        const html = '\ufeff<html><head><meta charset="utf-8"><title>PXN-Reader Word</title><style>body{font-family:"Microsoft YaHei",serif;line-height:1.7}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}p{margin:8px 0}</style></head><body>' + sections.join('\n') + '</body></html>';
+        downloadBlob(html, makeBaseName() + '.doc', 'application/msword;charset=utf-8');
+        setStatus('Word 已导出。');
+      }
+
+      function copyReadingDraft() {
+        if (!rows.length) return;
+        const text = buildReadingDraft();
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(function () {
+            setStatus('阅读稿已复制。');
+          }).catch(function () {
+            fallbackCopy(text);
+          });
+        } else {
+          fallbackCopy(text);
+        }
+      }
+
+      function fallbackCopy(text) {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        temp.style.position = 'fixed';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+        temp.focus();
+        temp.select();
+        try {
+          document.execCommand('copy');
+          setStatus('阅读稿已复制。');
+        } catch (error) {
+          setStatus('复制失败，请手动选择阅读稿内容。', true);
+        }
+        document.body.removeChild(temp);
+      }
+
+      function buildReadingDraft() {
+        const output = [];
+        let lastChapter = null;
+        let lastQuest = null;
+        let lastScene = null;
+        rows.forEach(function (row) {
+          if (row.chapter && row.chapter !== lastChapter) {
+            output.push('# ' + row.chapter);
+            lastChapter = row.chapter;
+            lastQuest = null;
+            lastScene = null;
+          }
+          if (row.quest && row.quest !== lastQuest) {
+            output.push('## ' + row.quest);
+            lastQuest = row.quest;
+            lastScene = null;
+          }
+          if (row.scene && row.scene !== lastScene) {
+            output.push('### ' + row.scene);
+            lastScene = row.scene;
+          }
+          const speaker = row.speaker ? row.speaker + '：' : '';
+          output.push('[' + row.content_id + '] [' + row.category + '] [' + typeTitle(row.type) + '] ' + speaker + row.content);
+          output.push('');
+        });
+        return output.join('\n').trim() + '\n';
+      }
+
+      function clearDocument() {
+        currentFileName = '';
+        rows = [];
+        els.file.value = '';
+        els.fileInfo.textContent = '尚未选择文件。';
+        els.markdownText.value = '';
+        renderTable();
+        updateStats();
+        setExportState(false);
+        setStatus('当前文档已清空。');
+      }
+
+      function updateStats() {
+        const chapters = new Set(rows.map(function (row) { return row.chapter; }).filter(Boolean));
+        const scenes = new Set(rows.map(function (row) { return [row.chapter, row.quest, row.scene].join(' / '); }).filter(function (key) { return key.trim() !== '/'; }));
+        const totalChars = rows.reduce(function (sum, row) { return sum + row.char_count; }, 0);
+        els.rowCount.textContent = rows.length;
+        els.charCount.textContent = totalChars;
+        els.chapterCount.textContent = chapters.size;
+        els.sceneCount.textContent = scenes.size;
+      }
+
+      function setExportState(enabled) {
+        els.exportWordBtn.disabled = !enabled;
+        els.exportExcelBtn.disabled = !enabled;
+        els.copyBtn.disabled = !enabled;
+      }
+
+      function setStatus(message, isError) {
+        els.status.textContent = message || '';
+        els.status.className = isError ? 'status error' : 'status';
+      }
+
+      function countCharacters(text) {
+        return Array.from(String(text || '').replace(/\s/g, '')).length;
+      }
+
+      function typeTitle(type) {
+        return {
+          npc: 'NPC',
+          player_choice: 'PlayerChoice',
+          narration: 'Narration',
+          system: 'System',
+          comment: 'Comment'
+        }[type] || type;
+      }
+
+      function makeBaseName() {
+        const name = currentFileName || 'PXN-Reader';
+        return name.replace(/\.md$/i, '') || 'PXN-Reader';
+      }
+
+      function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+      }
+
+      function downloadBlob(content, filename, type) {
+        const blob = new Blob([content], { type: type });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"]/g, function (char) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char];
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
