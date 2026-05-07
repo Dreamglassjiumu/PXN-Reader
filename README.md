@@ -37,7 +37,7 @@ python -m narrative_sheet input.md --docx output.docx
 仓库内提供示例文件：
 
 ```bash
-python -m narrative_sheet example/sample.md --xlsx sample.xlsx --docx sample.docx
+python -m narrative_sheet example/sample.md --xlsx output.xlsx --docx output.docx
 ```
 
 ## Markdown 格式
@@ -85,5 +85,5 @@ python -m narrative_sheet example/sample.md --xlsx sample.xlsx --docx sample.doc
 ## 测试
 
 ```bash
-pytest
+python -m pytest
 ```
