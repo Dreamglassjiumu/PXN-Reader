@@ -601,7 +601,8 @@
           </div>
           <div id="previewToolbar" class="preview-toolbar" hidden>
             <button id="wordPreviewBtn" class="secondary" type="button">Word 预览</button>
-            <button id="excelPreviewBtn" class="secondary" type="button">Excel 预览</button>
+            <button id="excelPreviewBtn" class="secondary" type="button">审阅表预览</button>
+            <button id="detailPreviewBtn" class="secondary" type="button">解析明细预览</button>
           </div>
           <div id="emptyState" class="empty">暂无解析结果。请选择文件后点击“开始解析”。</div>
           <div id="wordPreview" class="word-preview" hidden></div>
@@ -616,6 +617,7 @@
     </div>
   </div>
 
+  <script src="vendor/xlsx.full.min.js"></script>
   <script>
     (function () {
       'use strict';
@@ -652,7 +654,29 @@
         { field: 'content', label: 'content' },
         { field: 'char_count', label: 'char_count' }
       ];
-      const TABLE_CONTENT_KEYWORDS = ['内容', '说明', '描述', '效果', '需求', '机制', '备注', '正文', '包装要求'];
+      const TABLE_CONTENT_KEYWORDS = ['说明', '内容', '描述', '效果', '包装要求', '机制说明', '命座效果✏️', '需求', '机制', '备注', '正文'];
+      const REVIEW_ENTRY_KEYWORDS = ['名称', '字段', '字段名', '标签', '段落', '包装概述✏️', '命座名称✏️'];
+      const REVIEW_CONTENT_KEYWORDS = TABLE_CONTENT_KEYWORDS;
+      const REVIEW_COLUMNS = [
+        { field: '序号', label: '序号' },
+        { field: '分类', label: '分类' },
+        { field: '章节 / 小节', label: '章节 / 小节' },
+        { field: '类型', label: '类型' },
+        { field: '表格名称', label: '表格名称' },
+        { field: '条目名称', label: '条目名称' },
+        { field: '正文 / 说明', label: '正文 / 说明' },
+        { field: '备注', label: '备注' },
+        { field: '字数', label: '字数' }
+      ];
+      const BLOCK_TYPE_LABELS = {
+        heading: '标题',
+        paragraph: '段落',
+        table_row: '表格行',
+        list_item: '列表项',
+        quote: '引用',
+        code_block: '代码块',
+        horizontal_rule: '分隔线'
+      };
 
       const els = {
         file: document.getElementById('mdFile'),
@@ -676,6 +700,7 @@
         previewToolbar: document.getElementById('previewToolbar'),
         wordPreviewBtn: document.getElementById('wordPreviewBtn'),
         excelPreviewBtn: document.getElementById('excelPreviewBtn'),
+        detailPreviewBtn: document.getElementById('detailPreviewBtn'),
         wordPreview: document.getElementById('wordPreview'),
         tableWrap: document.getElementById('tableWrap'),
         tableHead: document.querySelector('#previewTable thead'),
@@ -686,7 +711,7 @@
       let rows = [];
       let currentAnalysis = null;
       let exportModeTouched = false;
-      let previewMode = 'excel';
+      let previewMode = 'review';
 
       els.file.addEventListener('change', handleFileChange);
       els.parseBtn.addEventListener('click', parseCurrentText);
@@ -700,7 +725,8 @@
         updateExportButtonStyle();
       });
       els.wordPreviewBtn.addEventListener('click', function () { setPreviewMode('word'); });
-      els.excelPreviewBtn.addEventListener('click', function () { setPreviewMode('excel'); });
+      els.excelPreviewBtn.addEventListener('click', function () { setPreviewMode('review'); });
+      els.detailPreviewBtn.addEventListener('click', function () { setPreviewMode('detail'); });
 
       fillSelect(els.docTypeSelect, DOCUMENT_TYPE_OPTIONS);
       fillSelect(els.exportModeSelect, EXPORT_MODE_OPTIONS);
@@ -1101,7 +1127,7 @@
         els.docTypeSelect.value = currentAnalysis.documentType;
         els.exportModeSelect.value = currentAnalysis.exportMode;
         els.recommendReason.textContent = '文档类型建议：' + currentAnalysis.documentType + '。导出方式建议：' + currentAnalysis.exportMode + '。' + currentAnalysis.reason;
-        setPreviewMode(currentAnalysis.exportMode === 'Word' ? 'word' : 'excel', true);
+        setPreviewMode(currentAnalysis.exportMode === 'Word' ? 'word' : 'review', true);
       }
 
       function handleDocumentTypeChange() {
@@ -1128,48 +1154,168 @@
       function renderTable() {
         els.tableHead.textContent = '';
         els.tableBody.textContent = '';
-        const dynamicColumns = collectDynamicColumns();
+        if (!rows.length) {
+          els.emptyState.hidden = false;
+          els.tableWrap.hidden = true;
+          return;
+        }
+        const isDetail = previewMode === 'detail';
+        const columns = isDetail ? buildDetailColumns() : REVIEW_COLUMNS;
+        const tableRows = isDetail ? buildDetailRows() : buildReviewRows();
         const headerTr = document.createElement('tr');
-        BASE_EXCEL_COLUMNS.concat(dynamicColumns.map(function (field) { return { field: field, label: field, dynamic: true }; })).forEach(function (column) {
+        columns.forEach(function (column) {
           const th = document.createElement('th');
           th.textContent = column.label;
           headerTr.appendChild(th);
         });
         els.tableHead.appendChild(headerTr);
 
-        rows.forEach(function (row, index) {
+        tableRows.forEach(function (tableRow) {
           const tr = document.createElement('tr');
-          BASE_EXCEL_COLUMNS.forEach(function (column) {
-            if (column.field === 'category') {
-              const categoryCell = document.createElement('td');
-              const select = document.createElement('select');
-              select.setAttribute('aria-label', '分类');
-              CATEGORY_OPTIONS.forEach(function (category) {
-                const option = document.createElement('option');
-                option.value = category;
-                option.textContent = category;
-                option.selected = category === row.category;
-                select.appendChild(option);
-              });
-              select.addEventListener('change', function () {
-                rows[index].category = select.value;
-                renderWordPreview();
-                setStatus('分类已更新。');
-              });
-              categoryCell.appendChild(select);
-              tr.appendChild(categoryCell);
+          columns.forEach(function (column) {
+            if (column.field === '分类') {
+              appendCategorySelectCell(tr, tableRow.__rowIndex);
+            } else if (column.field === 'category') {
+              appendCategorySelectCell(tr, tableRow.__rowIndex);
             } else {
-              appendCell(tr, getExcelCellValue(row, column.field, row[column.field]), column.field === 'content' ? 'content-cell' : '');
+              const isLongText = column.field === '正文 / 说明' || column.field === 'content' || column.dynamic;
+              appendCell(tr, tableRow[column.field], isLongText ? 'content-cell' : '');
             }
-          });
-          dynamicColumns.forEach(function (field) {
-            appendCell(tr, getExcelCellValue(row, field, row.dynamic_fields ? row.dynamic_fields[field] : ''), 'content-cell');
           });
           els.tableBody.appendChild(tr);
         });
 
-        els.emptyState.hidden = rows.length > 0;
-        els.tableWrap.hidden = rows.length === 0 || previewMode !== 'excel';
+        els.emptyState.hidden = true;
+        els.tableWrap.hidden = previewMode === 'word';
+      }
+
+      function appendCategorySelectCell(tr, rowIndex) {
+        const row = rows[rowIndex] || {};
+        const categoryCell = document.createElement('td');
+        const select = document.createElement('select');
+        select.setAttribute('aria-label', '分类');
+        CATEGORY_OPTIONS.forEach(function (category) {
+          const option = document.createElement('option');
+          option.value = category;
+          option.textContent = category;
+          option.selected = category === row.category;
+          select.appendChild(option);
+        });
+        select.addEventListener('change', function () {
+          rows[rowIndex].category = select.value;
+          renderWordPreview();
+          setStatus('分类已更新。');
+        });
+        categoryCell.appendChild(select);
+        tr.appendChild(categoryCell);
+      }
+
+      function buildDetailColumns() {
+        return BASE_EXCEL_COLUMNS.map(function (column) {
+          if (column.field === 'category') return { field: '分类', label: '分类', sourceField: 'category' };
+          return { field: column.field, label: column.label, sourceField: column.field };
+        }).concat(collectDynamicColumns().map(function (field) {
+          return { field: field, label: field, dynamic: true };
+        }));
+      }
+
+      function buildDetailRows() {
+        const columns = buildDetailColumns();
+        return rows.map(function (row, index) {
+          const output = { __rowIndex: index };
+          columns.forEach(function (column) {
+            if (column.dynamic) {
+              output[column.field] = getExcelCellValue(row, column.field, row.dynamic_fields ? row.dynamic_fields[column.field] : '');
+            } else {
+              const sourceField = column.sourceField || column.field;
+              output[column.field] = getExcelCellValue(row, sourceField, row[sourceField]);
+            }
+          });
+          return output;
+        });
+      }
+
+      function buildReviewRows() {
+        return rows.map(function (row, index) {
+          const body = buildReviewBody(row);
+          return {
+            __rowIndex: index,
+            '序号': row.content_id || makeTextId(index),
+            '分类': row.category || '其他',
+            '章节 / 小节': row.section_path || '',
+            '类型': getBlockTypeLabel(row.block_type),
+            '表格名称': row.table_name || '',
+            '条目名称': pickDynamicFieldValue(row, REVIEW_ENTRY_KEYWORDS),
+            '正文 / 说明': body,
+            '备注': buildReviewRemarks(row, body),
+            '字数': countCharacters(body)
+          };
+        });
+      }
+
+      function makeTextId(index) {
+        return 'TXT_' + String(index + 1).padStart(6, '0');
+      }
+
+      function getBlockTypeLabel(blockType) {
+        return BLOCK_TYPE_LABELS[blockType] || blockType || '';
+      }
+
+      function pickDynamicFieldValue(row, keywords) {
+        const fields = row.dynamic_fields || {};
+        const keys = Object.keys(fields);
+        for (let i = 0; i < keywords.length; i += 1) {
+          const keyword = keywords[i];
+          const exactKey = keys.find(function (key) { return key === keyword && hasUsefulValue(fields[key]); });
+          if (exactKey) return stripInlineMarkdown(fields[exactKey]);
+        }
+        for (let i = 0; i < keywords.length; i += 1) {
+          const keyword = keywords[i];
+          const fuzzyKey = keys.find(function (key) { return key.indexOf(keyword) !== -1 && hasUsefulValue(fields[key]); });
+          if (fuzzyKey) return stripInlineMarkdown(fields[fuzzyKey]);
+        }
+        return '';
+      }
+
+      function pickDynamicFieldEntries(row, keywords) {
+        const fields = row.dynamic_fields || {};
+        const keys = Object.keys(fields);
+        const picked = [];
+        keywords.forEach(function (keyword) {
+          keys.forEach(function (key) {
+            if ((key === keyword || key.indexOf(keyword) !== -1) && hasUsefulValue(fields[key]) && !picked.some(function (item) { return item.key === key; })) {
+              picked.push({ key: key, value: stripInlineMarkdown(fields[key]) });
+            }
+          });
+        });
+        return picked;
+      }
+
+      function buildReviewBody(row) {
+        const contentFields = pickDynamicFieldEntries(row, REVIEW_CONTENT_KEYWORDS);
+        if (row.block_type === 'table_row' && contentFields.length) {
+          return contentFields.map(function (item) { return item.key + '：' + item.value; }).join('\n');
+        }
+        const content = stripInlineMarkdown(row.content || '');
+        if (content) return content;
+        if (contentFields.length) return contentFields.map(function (item) { return item.key + '：' + item.value; }).join('\n');
+        return '';
+      }
+
+      function buildReviewRemarks(row, body) {
+        const fields = row.dynamic_fields || {};
+        const usedValues = [pickDynamicFieldValue(row, REVIEW_ENTRY_KEYWORDS), body].filter(Boolean);
+        const parts = [];
+        Object.keys(fields).forEach(function (key) {
+          const value = stripInlineMarkdown(fields[key]);
+          if (!value || usedValues.indexOf(value) !== -1) return;
+          parts.push(key + '：' + value);
+        });
+        return parts.join('；').slice(0, 500);
+      }
+
+      function hasUsefulValue(value) {
+        return String(value == null ? '' : value).trim() !== '';
       }
 
       function collectDynamicColumns() {
@@ -1210,13 +1356,16 @@
       }
 
       function setPreviewMode(mode, silent) {
-        previewMode = mode === 'word' ? 'word' : 'excel';
+        previewMode = ['word', 'review', 'detail'].indexOf(mode) === -1 ? 'review' : mode;
+        if (previewMode !== 'word') renderTable();
         els.wordPreview.hidden = rows.length === 0 || previewMode !== 'word';
-        els.tableWrap.hidden = rows.length === 0 || previewMode !== 'excel';
+        els.tableWrap.hidden = rows.length === 0 || previewMode === 'word';
         els.wordPreviewBtn.classList.toggle('is-active', previewMode === 'word');
-        els.excelPreviewBtn.classList.toggle('is-active', previewMode === 'excel');
+        els.excelPreviewBtn.classList.toggle('is-active', previewMode === 'review');
+        els.detailPreviewBtn.classList.toggle('is-active', previewMode === 'detail');
         if (!silent && rows.length) {
-          setStatus(previewMode === 'word' ? '已切换到 Word 预览。' : '已切换到 Excel 预览。');
+          const label = previewMode === 'word' ? 'Word 预览' : (previewMode === 'detail' ? '解析明细预览' : '审阅表预览');
+          setStatus('已切换到 ' + label + '。');
         }
       }
 
@@ -1242,23 +1391,58 @@
           setStatus('当前没有解析结果，不能导出 Excel。', true);
           return;
         }
-        const dynamicColumns = collectDynamicColumns();
-        const columns = BASE_EXCEL_COLUMNS.concat(dynamicColumns.map(function (field) { return { field: field, label: field, dynamic: true }; }));
-        const tableRows = [columns.map(function (column) { return column.label; })].concat(rows.map(function (row) {
-          return columns.map(function (column) {
-            const value = column.dynamic ? ((row.dynamic_fields && row.dynamic_fields[column.field]) || '') : row[column.field];
-            return getExcelCellValue(row, column.field, value);
-          });
-        }));
-        const tableHtml = tableRows.map(function (cells, rowIndex) {
-          const tag = rowIndex === 0 ? 'th' : 'td';
-          return '<tr>' + cells.map(function (cell) {
-            return '<' + tag + '>' + escapeHtml(cell == null ? '' : String(cell)).replace(/\n/g, '<br>') + '</' + tag + '>';
-          }).join('') + '</tr>';
-        }).join('');
-        const html = '\ufeff<html><head><meta charset="utf-8"><style>table{border-collapse:collapse}td,th{border:1px solid #999;padding:6px;vertical-align:top}th{font-weight:bold;background:#eee}</style></head><body><table>' + tableHtml + '</table></body></html>';
-        downloadBlob(html, makeBaseName() + '.xls', 'application/vnd.ms-excel;charset=utf-8');
-        setStatus('Excel 已导出。');
+        if (!window.XLSX || !XLSX.utils || !XLSX.writeFile) {
+          setStatus('未找到本地 XLSX 导出库，不能生成真正的 .xlsx 文件。', true);
+          return;
+        }
+        const reviewColumns = REVIEW_COLUMNS.map(function (column) { return column.field; });
+        const detailColumns = buildDetailColumns().map(function (column) { return column.field; });
+        const reviewRows = buildReviewRows().map(function (row) { return withoutInternalFields(row); });
+        const detailRows = buildDetailRows().map(function (row) { return withoutInternalFields(row); });
+        const workbook = XLSX.utils.book_new();
+        const reviewSheet = XLSX.utils.json_to_sheet(reviewRows, { header: reviewColumns });
+        const detailSheet = XLSX.utils.json_to_sheet(detailRows, { header: detailColumns });
+        applyWorksheetLayout(reviewSheet, reviewColumns, 'review');
+        applyWorksheetLayout(detailSheet, detailColumns, 'detail');
+        XLSX.utils.book_append_sheet(workbook, reviewSheet, '文案审阅表');
+        XLSX.utils.book_append_sheet(workbook, detailSheet, '解析明细');
+        XLSX.writeFile(workbook, makeBaseName() + '.xlsx');
+        setStatus('Excel 已导出为真正 .xlsx 文件，包含“文案审阅表”和“解析明细”两个 Sheet。');
+      }
+
+      function withoutInternalFields(row) {
+        const output = {};
+        Object.keys(row).forEach(function (key) {
+          if (key.indexOf('__') !== 0) output[key] = row[key];
+        });
+        return output;
+      }
+
+      function applyWorksheetLayout(sheet, headers, mode) {
+        const refEnd = headers.length ? encodeExcelCell(headers.length - 1, Math.max(rows.length, 1)) : 'A1';
+        sheet['!autofilter'] = { ref: 'A1:' + refEnd };
+        sheet['!freeze'] = { ySplit: 1 };
+        sheet['!cols'] = headers.map(function (header) {
+          if (header === '正文 / 说明') return { wch: 72 };
+          if (header === 'content') return { wch: 60 };
+          if (header === '备注') return { wch: 42 };
+          if (header === 'section_path' || header === '章节 / 小节') return { wch: 28 };
+          if (header === 'table_name' || header === '表格名称' || header === 'source_file') return { wch: 22 };
+          if (header === '条目名称' || header === 'speaker') return { wch: 18 };
+          if (header === 'char_count' || header === '字数' || header === 'row_index' || header === 'heading_level') return { wch: 10 };
+          return { wch: mode === 'detail' ? 16 : 14 };
+        });
+      }
+
+      function encodeExcelCell(columnIndex, rowIndex) {
+        let column = '';
+        let number = columnIndex + 1;
+        while (number > 0) {
+          const remainder = (number - 1) % 26;
+          column = String.fromCharCode(65 + remainder) + column;
+          number = Math.floor((number - 1) / 26);
+        }
+        return column + String(rowIndex + 1);
       }
 
       const WORD_EXPORT_CSS = [
@@ -1532,7 +1716,7 @@
         rows = [];
         currentAnalysis = null;
         exportModeTouched = false;
-        previewMode = 'excel';
+        previewMode = 'review';
         els.file.value = '';
         els.fileInfo.textContent = '尚未选择文件。';
         els.markdownText.value = '';
