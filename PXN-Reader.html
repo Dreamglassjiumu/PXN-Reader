@@ -601,8 +601,9 @@
           </div>
           <div id="previewToolbar" class="preview-toolbar" hidden>
             <button id="wordPreviewBtn" class="secondary" type="button">Word 预览</button>
-            <button id="excelPreviewBtn" class="secondary" type="button">审阅表预览</button>
-            <button id="detailPreviewBtn" class="secondary" type="button">解析明细预览</button>
+            <button id="excelPreviewBtn" class="secondary" type="button">审阅总表</button>
+            <span id="excelSheetButtons" class="preview-toolbar"></span>
+            <button id="detailPreviewBtn" class="secondary" type="button">解析明细</button>
           </div>
           <div id="emptyState" class="empty">暂无解析结果。请选择文件后点击“开始解析”。</div>
           <div id="wordPreview" class="word-preview" hidden></div>
@@ -667,8 +668,15 @@
         { field: 'category', label: '分类' },
         { field: 'source_file', label: 'source_file' },
         { field: 'section_path', label: 'section_path' },
+        { field: 'h1', label: 'h1' },
+        { field: 'h2', label: 'h2' },
+        { field: 'h3', label: 'h3' },
+        { field: 'h4', label: 'h4' },
+        { field: 'nearest_heading', label: 'nearest_heading' },
+        { field: 'module_name', label: 'module_name' },
         { field: 'heading_level', label: 'heading_level' },
         { field: 'block_type', label: 'block_type' },
+        { field: 'table_kind', label: 'table_kind' },
         { field: 'table_id', label: 'table_id' },
         { field: 'table_name', label: 'table_name' },
         { field: 'row_index', label: 'row_index' },
@@ -676,19 +684,22 @@
         { field: 'content', label: 'content' },
         { field: 'char_count', label: 'char_count' }
       ];
-      const TABLE_CONTENT_KEYWORDS = ['说明', '内容', '描述', '效果', '包装要求', '机制说明', '命座效果✏️', '需求', '机制', '备注', '正文'];
-      const REVIEW_ENTRY_KEYWORDS = ['名称', '字段', '字段名', '标签', '段落', '包装概述✏️', '命座名称✏️'];
+      const MACHINE_FIELDS = ['content_id', 'category', 'source_file', 'section_path', 'h1', 'h2', 'h3', 'h4', 'nearest_heading', 'module_name', 'heading_level', 'block_type', 'type', 'table_kind', 'table_id', 'table_name', 'row_index', 'speaker', 'content', 'char_count', 'chapter', 'quest', 'scene', 'code_language', 'list_level', 'list_marker', 'ordered'];
+      const TABLE_CONTENT_KEYWORDS = ['内容 / 包装要求✏️', '内容 / 包装要求', '内容 / 机制概述✏️', '内容 / 机制概述', '命座效果✏️', '命座效果', '机制说明', '说明', '描述', '效果', '需求', '正文', 'UI文本', '提示内容', '字数限制', '备注', 'content'];
+      const REVIEW_ENTRY_KEYWORDS = ['名称', '标题', '条目', '术语✏️', '术语', '标签✏️', '标签', '属性✏️', '属性', '命座名称✏️', '命座名称', '包装概述✏️', '包装概述', '段落', '字段类型', '字段名', 'nearest_heading'];
       const REVIEW_CONTENT_KEYWORDS = TABLE_CONTENT_KEYWORDS;
+      const REVIEW_EXTRA_KEYWORDS = ['配置表', '字段', '字段名', '字段类型', '涉及的技能数据名称', '涉及技能数据', '出现位置', '参数', '数值', '状态', '优先级', '备注'];
       const REVIEW_COLUMNS = [
         { field: '序号', label: '序号' },
         { field: '分类', label: '分类' },
-        { field: '章节 / 小节', label: '章节 / 小节' },
-        { field: '类型', label: '类型' },
-        { field: '表格名称', label: '表格名称' },
-        { field: '条目名称', label: '条目名称' },
+        { field: '文档位置', label: '文档位置' },
+        { field: '内容类型', label: '内容类型' },
+        { field: '标题 / 条目名', label: '标题 / 条目名' },
         { field: '正文 / 说明', label: '正文 / 说明' },
-        { field: '备注', label: '备注' },
-        { field: '字数', label: '字数' }
+        { field: '补充信息', label: '补充信息' },
+        { field: '是否需处理', label: '是否需处理' },
+        { field: '字数', label: '字数' },
+        { field: '来源表格', label: '来源表格' }
       ];
       const BLOCK_TYPE_LABELS = {
         heading: '标题',
@@ -697,8 +708,34 @@
         list_item: '列表项',
         quote: '引用',
         code_block: '代码块',
-        horizontal_rule: '分隔线'
+        horizontal_rule: '分隔线',
+        npc: '剧情对白',
+        narration: '旁白',
+        player_choice: '玩家选项',
+        system: '系统文本',
+        comment: '注释'
       };
+      const TABLE_KIND_LABELS = {
+        skill_packaging: '技能包装',
+        awakening: '命座文案',
+        terminology: '术语说明',
+        tag_table: '标签',
+        config_fields: '配置字段',
+        word_limit: '字数规范',
+        ui_text: 'UI 文案',
+        quest_requirement: '需求条目',
+        dialogue: '剧情对白',
+        generic_table: '表格行'
+      };
+      const SPECIAL_SHEET_DEFS = [
+        { key: 'skill_packaging_sheet', name: '技能包装表', headers: ['序号', '分类', '技能模块', '段落', '字段类型', '字段名', '内容 / 包装要求', '涉及技能数据', '是否需处理', '字数', '原章节'] },
+        { key: 'awakening_sheet', name: '命座文案', headers: ['序号', '分类', '命座名称', '命座效果', '是否需处理', '字数', '原章节'] },
+        { key: 'terminology_sheet', name: '术语与标签', headers: ['序号', '分类', '类型', '名称', '出现位置', '机制说明 / 备注', '是否需处理', '原章节'] },
+        { key: 'spec_sheet', name: '说明与规范', headers: ['序号', '分类', '类型', '项目', '配置表', '字段', '说明 / 限制', '是否需处理', '原章节'] },
+        { key: 'ui_text_sheet', name: 'UI 文案', headers: ['序号', '分类', '位置 / 场景', 'key / 字段', '中文文案', '英文 / 备注', '状态', '是否需处理', '字数', '原章节'] },
+        { key: 'requirement_sheet', name: '需求条目', headers: ['序号', '分类', '模块', '需求 / 目标', '规则 / 流程', '条件', '优先级', '状态', '备注', '是否需处理', '原章节'] },
+        { key: 'dialogue_sheet', name: '剧情对白', headers: ['序号', '分类', '章节', '场景', '角色', '内容', '情绪 / 表情 / 动作', '字数', '原章节'] }
+      ];
 
       const els = {
         file: document.getElementById('mdFile'),
@@ -722,6 +759,7 @@
         previewToolbar: document.getElementById('previewToolbar'),
         wordPreviewBtn: document.getElementById('wordPreviewBtn'),
         excelPreviewBtn: document.getElementById('excelPreviewBtn'),
+        excelSheetButtons: document.getElementById('excelSheetButtons'),
         detailPreviewBtn: document.getElementById('detailPreviewBtn'),
         wordPreview: document.getElementById('wordPreview'),
         tableWrap: document.getElementById('tableWrap'),
@@ -882,6 +920,7 @@
             tableCount += 1;
             const tableId = 'TABLE_' + String(tableCount).padStart(4, '0');
             const headers = splitMarkdownTableRow(lines[i]);
+            const tableKind = detectTableKind(headers);
             i += 2;
             let rowIndex = 1;
             while (i < lines.length && isTableBodyLine(lines[i])) {
@@ -893,6 +932,7 @@
                 table_id: tableId,
                 table_name: getCurrentTableName(),
                 row_index: rowIndex,
+                table_kind: tableKind,
                 content: makeTableRowContent(tableFields.columns, tableFields.dynamicFields),
                 dynamic_fields: tableFields.dynamicFields
               });
@@ -985,9 +1025,16 @@
             quest: quest,
             scene: scene,
             section_path: sectionTitles.filter(Boolean).join(' / '),
+            h1: sectionTitles[0] || '',
+            h2: sectionTitles[1] || '',
+            h3: sectionTitles[2] || '',
+            h4: sectionTitles[3] || '',
+            nearest_heading: getCurrentTableName(),
+            module_name: sectionTitles[2] || getCurrentTableName(),
             heading_level: '',
             block_type: 'paragraph',
             type: 'paragraph',
+            table_kind: '',
             table_id: '',
             table_name: '',
             row_index: '',
@@ -1051,6 +1098,35 @@
         return { columns: columns, dynamicFields: dynamicFields };
       }
 
+
+      function normalizeHeaderName(header) {
+        return stripInlineMarkdown(String(header || '')).replace(/✏️/g, '').replace(/\s+/g, '').toLowerCase();
+      }
+
+      function headerIncludes(headers, keyword) {
+        const normalizedKeyword = normalizeHeaderName(keyword);
+        return headers.some(function (header) { return normalizeHeaderName(header).indexOf(normalizedKeyword) !== -1; });
+      }
+
+      function countHeaderMatches(headers, keywords) {
+        return keywords.reduce(function (sum, keyword) {
+          return sum + (headerIncludes(headers, keyword) ? 1 : 0);
+        }, 0);
+      }
+
+      function detectTableKind(headers) {
+        const headerList = headers || [];
+        if (countHeaderMatches(headerList, ['段落', '字段类型', '字段名', '内容 / 包装要求', '内容 / 机制概述', '涉及的技能数据名称']) >= 3) return 'skill_packaging';
+        if ((headerIncludes(headerList, '命座名称') && headerIncludes(headerList, '命座效果')) || (headerIncludes(headerList, 'heroAwakeName') && headerIncludes(headerList, 'heroAwakeDesc'))) return 'awakening';
+        if ((headerIncludes(headerList, '术语') && headerIncludes(headerList, '机制说明')) || (headerIncludes(headerList, '属性') && headerIncludes(headerList, '机制说明'))) return 'terminology';
+        if (headerIncludes(headerList, '标签') && (headerIncludes(headerList, '备注') || headerIncludes(headerList, '出现位置'))) return 'tag_table';
+        if (headerIncludes(headerList, '配置表') && headerIncludes(headerList, '字段') && headerIncludes(headerList, '说明')) return 'config_fields';
+        if (headerIncludes(headerList, '字段类型') && headerIncludes(headerList, '字数限制')) return 'word_limit';
+        if (countHeaderMatches(headerList, ['按钮', '弹窗', '提示', '报错', 'UI文本', 'key', 'text', '中文', '英文']) >= 2) return 'ui_text';
+        if (countHeaderMatches(headerList, ['任务', '目标', '条件', '奖励', '规则', '流程', '验收', '优先级', '状态', '需求']) >= 2) return 'quest_requirement';
+        if (countHeaderMatches(headerList, ['角色', 'speaker', '台词', '对白', '语音', '情绪', '表情', '动作']) >= 2) return 'dialogue';
+        return 'generic_table';
+      }
       function makeTableRowContent(headers, dynamicFields) {
         const preferred = headers.find(function (header) {
           return TABLE_CONTENT_KEYWORDS.some(function (keyword) { return String(header || '').indexOf(keyword) !== -1; });
@@ -1181,9 +1257,9 @@
           els.tableWrap.hidden = true;
           return;
         }
-        const isDetail = previewMode === 'detail';
-        const columns = isDetail ? buildDetailColumns() : REVIEW_COLUMNS;
-        const tableRows = isDetail ? buildDetailRows() : buildReviewRows();
+        const previewSheet = getPreviewSheet(previewMode);
+        const columns = previewSheet.columns;
+        const tableRows = previewSheet.rows;
         const headerTr = document.createElement('tr');
         columns.forEach(function (column) {
           const th = document.createElement('th');
@@ -1200,7 +1276,7 @@
             } else if (column.field === 'category') {
               appendCategorySelectCell(tr, tableRow.__rowIndex);
             } else {
-              const isLongText = column.field === '正文 / 说明' || column.field === 'content' || column.dynamic;
+              const isLongText = ['正文 / 说明', '补充信息', 'content', '文档位置', '原章节', '内容 / 包装要求', '命座效果', '机制说明 / 备注', '说明 / 限制', '中文文案', '需求 / 目标', '规则 / 流程', '内容'].indexOf(column.field) !== -1 || column.dynamic;
               appendCell(tr, tableRow[column.field], isLongText ? 'content-cell' : '');
             }
           });
@@ -1209,6 +1285,31 @@
 
         els.emptyState.hidden = true;
         els.tableWrap.hidden = previewMode === 'word';
+      }
+
+
+      function getPreviewSheet(mode) {
+        if (mode === 'detail') return { columns: buildDetailColumns(), rows: buildDetailRows(), name: '解析明细' };
+        if (mode && mode.indexOf('sheet:') === 0) {
+          const key = mode.slice(6);
+          const sheet = buildSpecialSheets().find(function (item) { return item.key === key; });
+          if (sheet) return { columns: sheet.headers.map(function (header) { return { field: header, label: header }; }), rows: sheet.rows, name: sheet.name };
+        }
+        return { columns: REVIEW_COLUMNS, rows: buildReviewRows(), name: '审阅总表' };
+      }
+
+      function renderExcelSheetButtons() {
+        els.excelSheetButtons.textContent = '';
+        buildSpecialSheets().forEach(function (sheet) {
+          const button = document.createElement('button');
+          button.className = 'secondary';
+          button.type = 'button';
+          button.textContent = sheet.name;
+          button.dataset.previewMode = 'sheet:' + sheet.key;
+          button.classList.toggle('is-active', previewMode === button.dataset.previewMode);
+          button.addEventListener('click', function () { setPreviewMode(button.dataset.previewMode); });
+          els.excelSheetButtons.appendChild(button);
+        });
       }
 
       function appendCategorySelectCell(tr, rowIndex) {
@@ -1224,7 +1325,8 @@
           select.appendChild(option);
         });
         select.addEventListener('change', function () {
-          rows[rowIndex].category = select.value;
+          if (rows[rowIndex]) rows[rowIndex].category = select.value;
+          renderTable();
           renderWordPreview();
           setStatus('分类已更新。');
         });
@@ -1260,17 +1362,19 @@
       function buildReviewRows() {
         return rows.map(function (row, index) {
           const body = buildReviewBody(row);
+          const title = buildReviewTitle(row, body);
           return {
             __rowIndex: index,
             '序号': row.content_id || makeTextId(index),
             '分类': row.category || '其他',
-            '章节 / 小节': row.section_path || '',
-            '类型': getBlockTypeLabel(row.block_type),
-            '表格名称': row.table_name || '',
-            '条目名称': pickDynamicFieldValue(row, REVIEW_ENTRY_KEYWORDS),
+            '文档位置': cleanHumanText(row.section_path || ''),
+            '内容类型': getContentTypeLabel(row),
+            '标题 / 条目名': title,
             '正文 / 说明': body,
-            '备注': buildReviewRemarks(row, body),
-            '字数': countCharacters(body)
+            '补充信息': buildReviewRemarks(row, body, title),
+            '是否需处理': needsProcessing(row) ? '是' : '否',
+            '字数': countCharacters(body),
+            '来源表格': row.block_type === 'table_row' ? cleanHumanText(row.table_name || row.nearest_heading || '') : ''
           };
         });
       }
@@ -1283,20 +1387,31 @@
         return BLOCK_TYPE_LABELS[blockType] || blockType || '';
       }
 
-      function pickDynamicFieldValue(row, keywords) {
+      function getContentTypeLabel(row) {
+        if (row && row.block_type === 'table_row') return TABLE_KIND_LABELS[row.table_kind] || '表格行';
+        return getBlockTypeLabel(row && row.block_type);
+      }
+
+      function getDynamicValue(row, names) {
         const fields = row.dynamic_fields || {};
         const keys = Object.keys(fields);
-        for (let i = 0; i < keywords.length; i += 1) {
-          const keyword = keywords[i];
-          const exactKey = keys.find(function (key) { return key === keyword && hasUsefulValue(fields[key]); });
-          if (exactKey) return stripInlineMarkdown(fields[exactKey]);
+        for (let i = 0; i < names.length; i += 1) {
+          const name = names[i];
+          if (name === 'content' && hasUsefulValue(row.content)) return row.content;
+          if (name === 'nearest_heading' && hasUsefulValue(row.nearest_heading)) return row.nearest_heading;
+          const exactKey = keys.find(function (key) { return key === name && hasUsefulValue(fields[key]); });
+          if (exactKey) return fields[exactKey];
         }
-        for (let i = 0; i < keywords.length; i += 1) {
-          const keyword = keywords[i];
-          const fuzzyKey = keys.find(function (key) { return key.indexOf(keyword) !== -1 && hasUsefulValue(fields[key]); });
-          if (fuzzyKey) return stripInlineMarkdown(fields[fuzzyKey]);
+        for (let i = 0; i < names.length; i += 1) {
+          const name = names[i];
+          const fuzzyKey = keys.find(function (key) { return normalizeHeaderName(key).indexOf(normalizeHeaderName(name)) !== -1 && hasUsefulValue(fields[key]); });
+          if (fuzzyKey) return fields[fuzzyKey];
         }
         return '';
+      }
+
+      function pickDynamicFieldValue(row, keywords) {
+        return cleanHumanText(getDynamicValue(row, keywords));
       }
 
       function pickDynamicFieldEntries(row, keywords) {
@@ -1305,39 +1420,75 @@
         const picked = [];
         keywords.forEach(function (keyword) {
           keys.forEach(function (key) {
-            if ((key === keyword || key.indexOf(keyword) !== -1) && hasUsefulValue(fields[key]) && !picked.some(function (item) { return item.key === key; })) {
-              picked.push({ key: key, value: stripInlineMarkdown(fields[key]) });
+            if ((key === keyword || normalizeHeaderName(key).indexOf(normalizeHeaderName(keyword)) !== -1) && hasUsefulValue(fields[key]) && !picked.some(function (item) { return item.key === key; })) {
+              picked.push({ key: key, value: cleanHumanText(fields[key]) });
             }
           });
         });
         return picked;
       }
 
-      function buildReviewBody(row) {
-        const contentFields = pickDynamicFieldEntries(row, REVIEW_CONTENT_KEYWORDS);
-        if (row.block_type === 'table_row' && contentFields.length) {
-          return contentFields.map(function (item) { return item.key + '：' + item.value; }).join('\n');
-        }
-        const content = stripInlineMarkdown(row.content || '');
-        if (content) return content;
-        if (contentFields.length) return contentFields.map(function (item) { return item.key + '：' + item.value; }).join('\n');
-        return '';
+      function buildReviewTitle(row, body) {
+        const raw = pickDynamicFieldValue(row, REVIEW_ENTRY_KEYWORDS) || cleanHumanText(row.nearest_heading || '');
+        return raw && raw === body ? '' : raw;
       }
 
-      function buildReviewRemarks(row, body) {
+      function buildReviewBody(row) {
+        if (row.block_type !== 'table_row') return cleanHumanText(row.content || '');
+        const direct = pickDynamicFieldValue(row, REVIEW_CONTENT_KEYWORDS);
+        if (direct) return direct;
         const fields = row.dynamic_fields || {};
-        const usedValues = [pickDynamicFieldValue(row, REVIEW_ENTRY_KEYWORDS), body].filter(Boolean);
         const parts = [];
         Object.keys(fields).forEach(function (key) {
-          const value = stripInlineMarkdown(fields[key]);
-          if (!value || usedValues.indexOf(value) !== -1) return;
-          parts.push(key + '：' + value);
+          const value = cleanHumanText(fields[key]);
+          if (!value || isMachineField(key) || shouldExcludeFromFallback(key)) return;
+          parts.push(value);
         });
-        return parts.join('；').slice(0, 500);
+        return uniqueValues(parts).join('\n');
+      }
+
+      function buildReviewRemarks(row, body, title) {
+        const fields = row.dynamic_fields || {};
+        const usedValues = [body, title].filter(Boolean);
+        const parts = [];
+        REVIEW_EXTRA_KEYWORDS.forEach(function (keyword) {
+          Object.keys(fields).forEach(function (key) {
+            if (parts.some(function (item) { return item.key === key; })) return;
+            if (key !== keyword && normalizeHeaderName(key).indexOf(normalizeHeaderName(keyword)) === -1) return;
+            const value = cleanHumanText(fields[key]);
+            if (!value || usedValues.indexOf(value) !== -1) return;
+            parts.push({ key: cleanHumanText(key), value: value });
+          });
+        });
+        return parts.map(function (item) { return item.key + '：' + item.value; }).join('；').slice(0, 500);
       }
 
       function hasUsefulValue(value) {
         return String(value == null ? '' : value).trim() !== '';
+      }
+
+      function isMachineField(key) {
+        return MACHINE_FIELDS.indexOf(key) !== -1 || String(key || '').indexOf('__') === 0 || /^extra_\d+$/.test(String(key || ''));
+      }
+
+      function shouldExcludeFromFallback(key) {
+        return ['段落', '字段类型', '字段名', '涉及的技能数据名称', '涉及技能数据'].some(function (name) {
+          return normalizeHeaderName(key) === normalizeHeaderName(name);
+        });
+      }
+
+      function uniqueValues(values) {
+        const result = [];
+        values.forEach(function (value) {
+          if (value && result.indexOf(value) === -1) result.push(value);
+        });
+        return result;
+      }
+
+      function needsProcessing(row) {
+        const fields = row.dynamic_fields || {};
+        const source = [row.content, Object.keys(fields).join(' '), Object.keys(fields).map(function (key) { return fields[key]; }).join(' ')].join(' ');
+        return /✏️|TODO|待确认|待补充|暂无具体设计|占位|需要文案|包装|确认/i.test(source);
       }
 
       function collectDynamicColumns() {
@@ -1351,10 +1502,120 @@
       }
 
       function getExcelCellValue(row, field, value) {
-        if (row && row.block_type === 'table_row' && (field === 'content' || (row.dynamic_fields && Object.prototype.hasOwnProperty.call(row.dynamic_fields, field)))) {
-          return stripInlineMarkdown(value);
-        }
         return value;
+      }
+
+      function buildSpecialSheets() {
+        const sheets = [];
+        const builders = {
+          skill_packaging_sheet: buildSkillPackagingRows,
+          awakening_sheet: buildAwakeningRows,
+          terminology_sheet: buildTerminologyRows,
+          spec_sheet: buildSpecRows,
+          ui_text_sheet: buildUiTextRows,
+          requirement_sheet: buildRequirementRows,
+          dialogue_sheet: buildDialogueRows
+        };
+        SPECIAL_SHEET_DEFS.forEach(function (def) {
+          const data = builders[def.key]();
+          if (data.length) sheets.push({ key: def.key, name: def.name, headers: def.headers, rows: data });
+        });
+        return sheets;
+      }
+
+      function baseSheetRow(row) {
+        return { __rowIndex: rows.indexOf(row), '序号': row.content_id || '', '分类': row.category || '其他', '是否需处理': needsProcessing(row) ? '是' : '否', '原章节': cleanHumanText(row.section_path || '') };
+      }
+
+      function buildSkillPackagingRows() {
+        return rows.filter(function (row) { return row.table_kind === 'skill_packaging'; }).map(function (row) {
+          const body = pickDynamicFieldValue(row, ['内容 / 包装要求✏️', '内容 / 包装要求', '内容 / 机制概述✏️', '内容 / 机制概述', 'content']);
+          return Object.assign(baseSheetRow(row), {
+            '技能模块': cleanHumanText(row.module_name || row.nearest_heading || ''),
+            '段落': pickDynamicFieldValue(row, ['段落']),
+            '字段类型': pickDynamicFieldValue(row, ['字段类型']),
+            '字段名': pickDynamicFieldValue(row, ['字段名']),
+            '内容 / 包装要求': body,
+            '涉及技能数据': pickDynamicFieldValue(row, ['涉及的技能数据名称✏️', '涉及的技能数据名称', '涉及技能数据']),
+            '字数': countCharacters(body)
+          });
+        });
+      }
+
+      function buildAwakeningRows() {
+        return rows.filter(function (row) { return row.table_kind === 'awakening'; }).map(function (row) {
+          const desc = pickDynamicFieldValue(row, ['命座效果✏️', '命座效果', 'heroAwakeDesc', '描述', '效果']);
+          return Object.assign(baseSheetRow(row), {
+            '命座名称': pickDynamicFieldValue(row, ['命座名称✏️', '命座名称', 'heroAwakeName', '名称']),
+            '命座效果': desc,
+            '字数': countCharacters(desc)
+          });
+        });
+      }
+
+      function buildTerminologyRows() {
+        return rows.filter(function (row) { return row.table_kind === 'terminology' || row.table_kind === 'tag_table'; }).map(function (row) {
+          return Object.assign(baseSheetRow(row), {
+            '类型': row.table_kind === 'tag_table' ? '标签' : '术语',
+            '名称': pickDynamicFieldValue(row, ['术语✏️', '术语', '标签✏️', '标签', '属性✏️', '属性', '名称']),
+            '出现位置': pickDynamicFieldValue(row, ['出现位置', '位置']),
+            '机制说明 / 备注': pickDynamicFieldValue(row, ['机制说明', '说明', '备注', '描述'])
+          });
+        });
+      }
+
+      function buildSpecRows() {
+        return rows.filter(function (row) { return row.table_kind === 'config_fields' || row.table_kind === 'word_limit'; }).map(function (row) {
+          return Object.assign(baseSheetRow(row), {
+            '类型': row.table_kind === 'word_limit' ? '字数规范' : '配置字段',
+            '项目': pickDynamicFieldValue(row, ['项目', '字段类型', '名称', '条目']),
+            '配置表': pickDynamicFieldValue(row, ['配置表']),
+            '字段': pickDynamicFieldValue(row, ['字段', '字段名', 'key']),
+            '说明 / 限制': pickDynamicFieldValue(row, ['说明', '字数限制', '限制', '备注', '描述'])
+          });
+        });
+      }
+
+      function buildUiTextRows() {
+        return rows.filter(function (row) { return row.table_kind === 'ui_text'; }).map(function (row) {
+          const zh = pickDynamicFieldValue(row, ['中文', 'UI文本', 'text', '提示内容', '按钮', '弹窗', '报错', '正文']);
+          return Object.assign(baseSheetRow(row), {
+            '位置 / 场景': pickDynamicFieldValue(row, ['位置', '场景', '出现位置', '模块']),
+            'key / 字段': pickDynamicFieldValue(row, ['key', '字段', 'ID', 'id']),
+            '中文文案': zh,
+            '英文 / 备注': pickDynamicFieldValue(row, ['英文', '备注', '说明']),
+            '状态': pickDynamicFieldValue(row, ['状态']),
+            '字数': countCharacters(zh)
+          });
+        });
+      }
+
+      function buildRequirementRows() {
+        return rows.filter(function (row) { return row.table_kind === 'quest_requirement'; }).map(function (row) {
+          return Object.assign(baseSheetRow(row), {
+            '模块': cleanHumanText(row.module_name || row.nearest_heading || ''),
+            '需求 / 目标': pickDynamicFieldValue(row, ['需求', '目标', '任务', '条目', '说明']),
+            '规则 / 流程': pickDynamicFieldValue(row, ['规则', '流程', '验收']),
+            '条件': pickDynamicFieldValue(row, ['条件']),
+            '优先级': pickDynamicFieldValue(row, ['优先级']),
+            '状态': pickDynamicFieldValue(row, ['状态']),
+            '备注': pickDynamicFieldValue(row, ['备注'])
+          });
+        });
+      }
+
+      function buildDialogueRows() {
+        return rows.filter(function (row) { return row.table_kind === 'dialogue' || ['npc', 'narration', 'player_choice'].indexOf(row.block_type) !== -1; }).map(function (row) {
+          const content = row.table_kind === 'dialogue' ? pickDynamicFieldValue(row, ['台词', '对白', '内容', 'text', '语音']) : cleanHumanText(row.content || '');
+          return Object.assign(baseSheetRow(row), {
+            '章节': cleanHumanText(row.h1 || row.chapter || ''),
+            '场景': cleanHumanText(row.h3 || row.scene || row.h2 || ''),
+            '角色': row.table_kind === 'dialogue' ? pickDynamicFieldValue(row, ['角色', 'speaker', '说话人']) : cleanHumanText(row.speaker || getBlockTypeLabel(row.block_type)),
+            '内容': content,
+            '情绪 / 表情 / 动作': pickDynamicFieldValue(row, ['情绪', '表情', '动作']),
+            '字数': countCharacters(content)
+          });
+        });
       }
 
       function appendCell(tr, value, className) {
@@ -1365,6 +1626,7 @@
       }
 
       function renderPreviews() {
+        renderExcelSheetButtons();
         renderTable();
         renderWordPreview();
         els.recommendPanel.hidden = rows.length === 0;
@@ -1378,15 +1640,20 @@
       }
 
       function setPreviewMode(mode, silent) {
-        previewMode = ['word', 'review', 'detail'].indexOf(mode) === -1 ? 'review' : mode;
+        const validSheetMode = typeof mode === 'string' && mode.indexOf('sheet:') === 0 && buildSpecialSheets().some(function (sheet) { return mode === 'sheet:' + sheet.key; });
+        previewMode = (['word', 'review', 'detail'].indexOf(mode) !== -1 || validSheetMode) ? mode : 'review';
+        renderExcelSheetButtons();
         if (previewMode !== 'word') renderTable();
         els.wordPreview.hidden = rows.length === 0 || previewMode !== 'word';
         els.tableWrap.hidden = rows.length === 0 || previewMode === 'word';
         els.wordPreviewBtn.classList.toggle('is-active', previewMode === 'word');
         els.excelPreviewBtn.classList.toggle('is-active', previewMode === 'review');
         els.detailPreviewBtn.classList.toggle('is-active', previewMode === 'detail');
+        Array.prototype.forEach.call(els.excelSheetButtons.querySelectorAll('button'), function (button) {
+          button.classList.toggle('is-active', previewMode === button.dataset.previewMode);
+        });
         if (!silent && rows.length) {
-          const label = previewMode === 'word' ? 'Word 预览' : (previewMode === 'detail' ? '解析明细预览' : '审阅表预览');
+          const label = previewMode === 'word' ? 'Word 预览' : getPreviewSheet(previewMode).name;
           setStatus('已切换到 ' + label + '。');
         }
       }
@@ -1423,13 +1690,20 @@
         const detailRows = buildDetailRows().map(function (row) { return withoutInternalFields(row); });
         const workbook = XLSX.utils.book_new();
         const reviewSheet = XLSX.utils.json_to_sheet(reviewRows, { header: reviewColumns });
+        applyWorksheetLayout(reviewSheet, reviewColumns, 'review', reviewRows.length);
+        XLSX.utils.book_append_sheet(workbook, reviewSheet, '审阅总表');
+        const specialSheets = buildSpecialSheets();
+        specialSheets.forEach(function (sheetDef) {
+          const sheetRows = sheetDef.rows.map(function (row) { return withoutInternalFields(row); });
+          const sheet = XLSX.utils.json_to_sheet(sheetRows, { header: sheetDef.headers });
+          applyWorksheetLayout(sheet, sheetDef.headers, 'special', sheetRows.length);
+          XLSX.utils.book_append_sheet(workbook, sheet, sheetDef.name);
+        });
         const detailSheet = XLSX.utils.json_to_sheet(detailRows, { header: detailColumns });
-        applyWorksheetLayout(reviewSheet, reviewColumns, 'review');
-        applyWorksheetLayout(detailSheet, detailColumns, 'detail');
-        XLSX.utils.book_append_sheet(workbook, reviewSheet, '文案审阅表');
+        applyWorksheetLayout(detailSheet, detailColumns, 'detail', detailRows.length);
         XLSX.utils.book_append_sheet(workbook, detailSheet, '解析明细');
         XLSX.writeFile(workbook, makeBaseName() + '.xlsx');
-        setStatus('Excel 已导出为真正 .xlsx 文件，包含“文案审阅表”和“解析明细”两个 Sheet。');
+        setStatus('Excel 已导出为 v2 结构 .xlsx：审阅总表、' + (specialSheets.length ? specialSheets.map(function (sheet) { return sheet.name; }).join('、') + '、' : '') + '解析明细。');
       }
 
       function withoutInternalFields(row) {
@@ -1440,18 +1714,17 @@
         return output;
       }
 
-      function applyWorksheetLayout(sheet, headers, mode) {
-        const refEnd = headers.length ? encodeExcelCell(headers.length - 1, Math.max(rows.length, 1)) : 'A1';
+      function applyWorksheetLayout(sheet, headers, mode, rowCount) {
+        const refEnd = headers.length ? encodeExcelCell(headers.length - 1, Math.max(Number(rowCount) || 0, 1)) : 'A1';
         sheet['!autofilter'] = { ref: 'A1:' + refEnd };
         sheet['!freeze'] = { ySplit: 1 };
         sheet['!cols'] = headers.map(function (header) {
-          if (header === '正文 / 说明') return { wch: 72 };
-          if (header === 'content') return { wch: 60 };
-          if (header === '备注') return { wch: 42 };
-          if (header === 'section_path' || header === '章节 / 小节') return { wch: 28 };
-          if (header === 'table_name' || header === '表格名称' || header === 'source_file') return { wch: 22 };
-          if (header === '条目名称' || header === 'speaker') return { wch: 18 };
-          if (header === 'char_count' || header === '字数' || header === 'row_index' || header === 'heading_level') return { wch: 10 };
+          if (['正文 / 说明', '内容 / 包装要求', '命座效果', '机制说明 / 备注', '说明 / 限制', '中文文案', '需求 / 目标', '规则 / 流程', '内容', 'content'].indexOf(header) !== -1) return { wch: 64 };
+          if (['补充信息', '备注', '英文 / 备注', '情绪 / 表情 / 动作'].indexOf(header) !== -1) return { wch: 38 };
+          if (['section_path', '文档位置', '原章节'].indexOf(header) !== -1) return { wch: 30 };
+          if (['table_name', '来源表格', 'source_file', '技能模块', 'module_name', 'nearest_heading'].indexOf(header) !== -1) return { wch: 22 };
+          if (['标题 / 条目名', '命座名称', '名称', 'speaker', '角色'].indexOf(header) !== -1) return { wch: 18 };
+          if (['char_count', '字数', 'row_index', 'heading_level', '是否需处理'].indexOf(header) !== -1) return { wch: 10 };
           return { wch: mode === 'detail' ? 16 : 14 };
         });
       }
@@ -1630,10 +1903,18 @@
         return '<div class="table-field-block"><p class="table-field-title">【记录 ' + escapeHtml(row.row_index || '') + '】</p><p>' + formatInlineMarkdown(row.content || '').replace(/；/g, '<br>') + '</p></div>';
       }
 
+      function cleanHumanText(value) {
+        return stripInlineMarkdown(value)
+          .replace(/<\/?[^>]+>/g, '')
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+
       function stripInlineMarkdown(value) {
         return String(value == null ? '' : value)
           .replace(/`([^`]+)`/g, '$1')
-          .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, '$1')
+          .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, '$1（$2）')
           .replace(/\*\*([^*\n]+)\*\*/g, '$1')
           .replace(/__([^_\n]+)__/g, '$1');
       }
