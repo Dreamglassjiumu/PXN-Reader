@@ -645,7 +645,7 @@
     (function () {
       'use strict';
 
-      const CATEGORY_OPTIONS = ['主线剧情', '支线任务', '世界观设定', 'NPC对白', '系统文本', '其他'];
+      const CATEGORY_OPTIONS = ['技能文案', '命座文案', '术语说明', '标签包装', '配置字段', '字数规范', 'UI文案', '需求说明', '剧情对白', '表格内容', '文档说明', '文档结构', '列表内容', '引用说明', '代码块', '主线剧情', '支线任务', '世界观设定', 'NPC对白', '系统文本', '其他'];
       const DOCUMENT_TYPE_OPTIONS = ['剧情文案', 'NPC对白', '世界观设定', '需求说明', '系统文本', '配置文案', '其他'];
       const EXPORT_MODE_OPTIONS = ['Word', 'Excel', 'Word 和 Excel'];
       const EXPORT_MODE_BY_DOCUMENT_TYPE = {
@@ -685,10 +685,12 @@
         { field: 'char_count', label: 'char_count' }
       ];
       const MACHINE_FIELDS = ['content_id', 'category', 'source_file', 'section_path', 'h1', 'h2', 'h3', 'h4', 'nearest_heading', 'module_name', 'heading_level', 'block_type', 'type', 'table_kind', 'table_id', 'table_name', 'row_index', 'speaker', 'content', 'char_count', 'chapter', 'quest', 'scene', 'code_language', 'list_level', 'list_marker', 'ordered'];
-      const TABLE_CONTENT_KEYWORDS = ['内容 / 包装要求✏️', '内容 / 包装要求', '内容 / 机制概述✏️', '内容 / 机制概述', '命座效果✏️', '命座效果', '机制说明', '说明', '描述', '效果', '需求', '正文', 'UI文本', '提示内容', '字数限制', '备注', 'content'];
-      const REVIEW_ENTRY_KEYWORDS = ['名称', '标题', '条目', '术语✏️', '术语', '标签✏️', '标签', '属性✏️', '属性', '命座名称✏️', '命座名称', '包装概述✏️', '包装概述', '段落', '字段类型', '字段名', 'nearest_heading'];
+      const TABLE_CONTENT_KEYWORDS = ['normalized_content', '内容 / 包装要求✏️', '内容 / 机制概述✏️', '内容 / 包装要求', '内容 / 机制概述', '命座效果✏️', '命座效果', '机制说明', '说明', '描述', '效果', '需求', '正文', 'UI文本', '提示内容', '字数限制', '备注', 'content'];
+      const REVIEW_ENTRY_KEYWORDS = ['名称', '标题', '条目', '术语✏️', '术语', '标签✏️', '标签', '属性✏️', '属性', '命座名称✏️', '命座名称', '包装概述✏️', '包装概述', '段落', 'nearest_heading'];
       const REVIEW_CONTENT_KEYWORDS = TABLE_CONTENT_KEYWORDS;
       const REVIEW_EXTRA_KEYWORDS = ['配置表', '字段', '字段名', '字段类型', '涉及的技能数据名称', '涉及技能数据', '出现位置', '参数', '数值', '状态', '优先级', '备注'];
+      const HUMAN_BODY_FORBIDDEN_LABELS = ['段落', '字段类型', '字段名', '内容 / 包装要求', '内容 / 机制概述', '涉及的技能数据名称', 'block_type', 'table_id', 'row_index', 'source_file', 'section_path'];
+      const PROCESSING_KEYWORDS = ['TODO', '待确认', '待补充', '占位', '暂无具体设计', '需要文案', '包装', '请补充', '待填'];
       const REVIEW_COLUMNS = [
         { field: '序号', label: '序号' },
         { field: '分类', label: '分类' },
@@ -925,7 +927,7 @@
             let rowIndex = 1;
             while (i < lines.length && isTableBodyLine(lines[i])) {
               const values = splitMarkdownTableRow(lines[i]);
-              const tableFields = normalizeMarkdownTableFields(headers, values);
+              const tableFields = normalizeMarkdownTableFields(headers, values, tableKind);
               addRow({
                 block_type: 'table_row',
                 type: 'table_row',
@@ -1080,7 +1082,7 @@
         return trimmed.split('|').map(function (cell) { return cell.trim(); });
       }
 
-      function normalizeMarkdownTableFields(headers, values) {
+      function normalizeMarkdownTableFields(headers, values, tableKind) {
         const columns = headers.map(function (header, index) {
           return header || ('列' + (index + 1));
         });
@@ -1095,7 +1097,97 @@
             dynamicFields[column] = value == null ? '' : value;
           });
         }
+        const normalized = normalizeTableRow(headers, values, tableKind, dynamicFields);
+        Object.keys(normalized.fields).forEach(function (key) {
+          dynamicFields[key] = normalized.fields[key];
+          if (columns.indexOf(key) === -1) columns.push(key);
+        });
+        dynamicFields.normalized_fields = JSON.stringify(normalized.fields);
+        dynamicFields.normalized_content = normalized.content || '';
+        dynamicFields.original_cells = JSON.stringify(values);
+        ['normalized_fields', 'normalized_content', 'original_cells'].forEach(function (key) {
+          if (columns.indexOf(key) === -1) columns.push(key);
+        });
         return { columns: columns, dynamicFields: dynamicFields };
+      }
+
+      function normalizeTableRow(headers, values, tableKind, rawFields) {
+        const cells = (values || []).map(function (value) { return cleanHumanText(value); });
+        const fields = {};
+        function setField(name, value) {
+          if (!name || !hasUsefulValue(value)) return;
+          fields[name] = cleanHumanText(value);
+        }
+        if (tableKind === 'skill_packaging') {
+          const codeIndex = cells.findIndex(function (cell) { return isCodeFieldName(cell); });
+          if (cells.length === 3 && codeIndex === 1) {
+            setField('段落', cells[0]);
+            setField('字段类型', inferSkillFieldType(cells[0], ''));
+            setField('字段名', stripCodeTicks(cells[1]));
+            setField('内容 / 包装要求', cells[2]);
+          } else if (cells.length === 4 && codeIndex === 2) {
+            setField('段落', cells[0]);
+            setField('字段类型', cells[1] || inferSkillFieldType(cells[0], ''));
+            setField('字段名', stripCodeTicks(cells[2]));
+            setField('内容 / 包装要求', cells[3]);
+          } else if (cells.length >= 5) {
+            setField('段落', getDynamicByNormalizedName(rawFields, ['段落']) || cells[0]);
+            setField('字段类型', getDynamicByNormalizedName(rawFields, ['字段类型']) || cells[1]);
+            setField('字段名', stripCodeTicks(getDynamicByNormalizedName(rawFields, ['字段名']) || cells[2]));
+            setField('内容 / 包装要求', getDynamicByNormalizedName(rawFields, ['内容 / 包装要求✏️', '内容 / 机制概述✏️', '内容 / 包装要求', '内容 / 机制概述']) || cells[3]);
+            setField('涉及的技能数据名称', getDynamicByNormalizedName(rawFields, ['涉及的技能数据名称✏️', '涉及的技能数据名称']) || cells[4]);
+          }
+          if (!fields['字段类型'] && fields['段落']) setField('字段类型', inferSkillFieldType(fields['段落'], fields['字段类型']));
+          return { fields: fields, content: fields['内容 / 包装要求'] || '' };
+        }
+        if (tableKind === 'terminology' && cells.length === 2 && looksLikeExplanation(cells[1])) {
+          setField('术语', cells[0]);
+          fields['出现位置'] = '';
+          setField('机制说明', cells[1]);
+          return { fields: fields, content: cells[1] };
+        }
+        if (tableKind === 'tag_table' && cells.length === 1) {
+          setField('标签', cells[0]);
+          fields['备注'] = '';
+          return { fields: fields, content: cells[0] };
+        }
+        return { fields: fields, content: '' };
+      }
+
+      function stripCodeTicks(value) {
+        return cleanHumanText(value).replace(/^`+|`+$/g, '').trim();
+      }
+
+      function isCodeFieldName(value) {
+        const cleaned = stripCodeTicks(value);
+        return /^(name|title|content|tagtext|tagText|heroAwakeName|heroAwakeDesc|paramName)$/i.test(cleaned) || /^[A-Za-z_][A-Za-z0-9_]*(?:[A-Z][A-Za-z0-9_]*)*$/.test(cleaned);
+      }
+
+      function inferSkillFieldType(paragraph, fallback) {
+        const text = cleanHumanText(paragraph || fallback || '');
+        if (/正文|效果标签|技能类型标签/.test(text)) return text;
+        return cleanHumanText(fallback || paragraph || '');
+      }
+
+      function looksLikeExplanation(value) {
+        const text = cleanHumanText(value);
+        return text.length >= 14 || /，|。|；|：|指|一种|用于|表示|说明|机制|效果|当|时|角色|玩家|操作/.test(text);
+      }
+
+      function getDynamicByNormalizedName(fields, names) {
+        const source = fields || {};
+        const keys = Object.keys(source);
+        for (let i = 0; i < names.length; i += 1) {
+          const wanted = normalizeHeaderName(names[i]);
+          const exact = keys.find(function (key) { return normalizeHeaderName(key) === wanted && hasUsefulValue(source[key]); });
+          if (exact) return source[exact];
+        }
+        for (let i = 0; i < names.length; i += 1) {
+          const wanted = normalizeHeaderName(names[i]);
+          const fuzzy = keys.find(function (key) { return normalizeHeaderName(key).indexOf(wanted) !== -1 && hasUsefulValue(source[key]); });
+          if (fuzzy) return source[fuzzy];
+        }
+        return '';
       }
 
 
@@ -1129,23 +1221,51 @@
       }
       function makeTableRowContent(headers, dynamicFields) {
         const preferred = headers.find(function (header) {
-          return TABLE_CONTENT_KEYWORDS.some(function (keyword) { return String(header || '').indexOf(keyword) !== -1; });
+          return TABLE_CONTENT_KEYWORDS.some(function (keyword) { return normalizeHeaderName(header).indexOf(normalizeHeaderName(keyword)) !== -1; });
         });
-        if (preferred && dynamicFields[preferred]) return dynamicFields[preferred];
-        return headers.map(function (header) {
-          const name = header || '列';
-          return name + '：' + (dynamicFields[name] || '');
-        }).join('；');
+        if (preferred && dynamicFields[preferred]) return cleanBodyText(dynamicFields[preferred]);
+        const businessValues = [];
+        (headers || []).forEach(function (header) {
+          const value = cleanBodyText(dynamicFields[header]);
+          if (!value || isMachineField(header) || shouldExcludeFromFallback(header)) return;
+          businessValues.push(value);
+        });
+        return uniqueValues(businessValues).join('\n');
       }
 
       function suggestCategory(row) {
+        if (row.category_touched) return row.category;
+        const byKind = {
+          skill_packaging: '技能文案',
+          awakening: '命座文案',
+          terminology: '术语说明',
+          tag_table: '标签包装',
+          config_fields: '配置字段',
+          word_limit: '字数规范',
+          ui_text: 'UI文案',
+          quest_requirement: '需求说明',
+          dialogue: '剧情对白',
+          generic_table: '表格内容'
+        };
+        const byBlock = {
+          paragraph: '文档说明',
+          heading: '文档结构',
+          list_item: '列表内容',
+          quote: '引用说明',
+          code_block: '代码块',
+          horizontal_rule: '文档结构',
+          npc: '剧情对白',
+          narration: '剧情对白',
+          player_choice: '剧情对白',
+          system: 'UI文案'
+        };
+        if (byKind[row.table_kind]) return byKind[row.table_kind];
+        if (byBlock[row.block_type || row.type]) return byBlock[row.block_type || row.type];
         const haystack = [row.chapter, row.quest, row.scene, row.content].join(' ').toLowerCase();
-        if (row.type === 'system') return '系统文本';
-        if (row.type === 'npc') return 'NPC对白';
         if (/支线|side|branch|optional/.test(haystack)) return '支线任务';
         if (/世界观|设定|背景|历史|地理|lore|world/.test(haystack)) return '世界观设定';
         if (/主线|main|story|剧情/.test(haystack)) return '主线剧情';
-        return '其他';
+        return '表格内容';
       }
 
       function analyzeDocument(text, parsedRows) {
@@ -1325,7 +1445,10 @@
           select.appendChild(option);
         });
         select.addEventListener('change', function () {
-          if (rows[rowIndex]) rows[rowIndex].category = select.value;
+          if (rows[rowIndex]) {
+            rows[rowIndex].category = select.value;
+            rows[rowIndex].category_touched = true;
+          }
           renderTable();
           renderWordPreview();
           setStatus('分类已更新。');
@@ -1366,7 +1489,7 @@
           return {
             __rowIndex: index,
             '序号': row.content_id || makeTextId(index),
-            '分类': row.category || '其他',
+            '分类': row.category || suggestCategory(row),
             '文档位置': cleanHumanText(row.section_path || ''),
             '内容类型': getContentTypeLabel(row),
             '标题 / 条目名': title,
@@ -1376,6 +1499,8 @@
             '字数': countCharacters(body),
             '来源表格': row.block_type === 'table_row' ? cleanHumanText(row.table_name || row.nearest_heading || '') : ''
           };
+        }).filter(function (item) {
+          return shouldIncludeInReview(rows[item.__rowIndex], item);
         });
       }
 
@@ -1388,6 +1513,7 @@
       }
 
       function getContentTypeLabel(row) {
+        if (row && row.block_type === 'heading') return '标题';
         if (row && row.block_type === 'table_row') return TABLE_KIND_LABELS[row.table_kind] || '表格行';
         return getBlockTypeLabel(row && row.block_type);
       }
@@ -1411,7 +1537,7 @@
       }
 
       function pickDynamicFieldValue(row, keywords) {
-        return cleanHumanText(getDynamicValue(row, keywords));
+        return cleanBodyText(getDynamicValue(row, keywords));
       }
 
       function pickDynamicFieldEntries(row, keywords) {
@@ -1434,17 +1560,31 @@
       }
 
       function buildReviewBody(row) {
-        if (row.block_type !== 'table_row') return cleanHumanText(row.content || '');
+        if (row.block_type !== 'table_row') return cleanBodyText(row.content || '');
         const direct = pickDynamicFieldValue(row, REVIEW_CONTENT_KEYWORDS);
-        if (direct) return direct;
+        if (direct) return cleanBodyText(direct);
         const fields = row.dynamic_fields || {};
         const parts = [];
         Object.keys(fields).forEach(function (key) {
-          const value = cleanHumanText(fields[key]);
+          const value = cleanBodyText(fields[key]);
           if (!value || isMachineField(key) || shouldExcludeFromFallback(key)) return;
           parts.push(value);
         });
         return uniqueValues(parts).join('\n');
+      }
+
+      function shouldIncludeInReview(row, item) {
+        if (!row) return false;
+        if (row.block_type === 'horizontal_rule') return false;
+        if (row.block_type === 'quote' && !cleanHumanText(row.content || '').replace(/^>+$/, '').trim()) return false;
+        if (row.block_type === 'heading') return true;
+        const hasBody = hasUsefulValue(item['正文 / 说明']);
+        const hasTitle = hasUsefulValue(item['标题 / 条目名']);
+        const hasBusinessField = Object.keys(row.dynamic_fields || {}).some(function (key) {
+          return !isMachineField(key) && !/^normalized_|^original_cells$/.test(key) && hasUsefulValue(row.dynamic_fields[key]);
+        });
+        if (!hasBody && !hasTitle && !hasBusinessField) return false;
+        return !isStructureOnlyRow(row, item['正文 / 说明']);
       }
 
       function buildReviewRemarks(row, body, title) {
@@ -1467,14 +1607,54 @@
         return String(value == null ? '' : value).trim() !== '';
       }
 
+      function escapeRegExp(value) {
+        return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      function cleanBodyText(value) {
+        let text = cleanHumanText(value);
+        HUMAN_BODY_FORBIDDEN_LABELS.forEach(function (label) {
+          const pattern = escapeRegExp(label).replace(/\\ /g, '\\s*');
+          text = text.replace(new RegExp('(?:^|[；;\\n])\\s*' + pattern + '\\s*[:：]\\s*', 'g'), function (match) {
+            return match.charAt(0) === '\n' ? '\n' : '';
+          });
+        });
+        return text.replace(/[；;\n]*\s*(?:block_type|table_id|row_index|source_file|section_path)\s*[:：][^；;\n]*/g, '').trim();
+      }
+
+      function hasForbiddenBodyLabel(value) {
+        const text = String(value || '');
+        return HUMAN_BODY_FORBIDDEN_LABELS.some(function (label) {
+          return new RegExp(escapeRegExp(label) + '\\s*[:：]').test(text);
+        });
+      }
+
       function isMachineField(key) {
         return MACHINE_FIELDS.indexOf(key) !== -1 || String(key || '').indexOf('__') === 0 || /^extra_\d+$/.test(String(key || ''));
       }
 
       function shouldExcludeFromFallback(key) {
-        return ['段落', '字段类型', '字段名', '涉及的技能数据名称', '涉及技能数据'].some(function (name) {
+        return ['段落', '字段类型', '字段名', '涉及的技能数据名称', '涉及技能数据', 'normalized_fields', 'original_cells'].some(function (name) {
           return normalizeHeaderName(key) === normalizeHeaderName(name);
         });
+      }
+
+      function isBusinessContentRow(row) {
+        if (!row || row.block_type !== 'table_row') return false;
+        if (row.table_kind === 'word_limit') return false;
+        const body = buildReviewBody(row);
+        return hasUsefulValue(body) || ['skill_packaging', 'awakening', 'terminology', 'tag_table', 'ui_text', 'quest_requirement', 'dialogue'].indexOf(row.table_kind) !== -1;
+      }
+
+      function isStructureOnlyRow(row, body) {
+        if (!row) return true;
+        if (row.block_type === 'heading' || row.block_type === 'horizontal_rule') return true;
+        if (row.table_kind === 'word_limit') return true;
+        if (/配置表说明|字数限制/.test(cleanHumanText(row.nearest_heading || row.table_name || ''))) return true;
+        const text = cleanHumanText(body || row.content || '');
+        if (!text) return true;
+        if (isCodeFieldName(text)) return true;
+        return false;
       }
 
       function uniqueValues(values) {
@@ -1486,9 +1666,23 @@
       }
 
       function needsProcessing(row) {
+        if (!row) return false;
+        if (row.block_type === 'heading' || row.block_type === 'horizontal_rule') return false;
+        if (row.block_type === 'quote' && !cleanHumanText(row.content || '').replace(/^>+$/, '').trim()) return false;
+        if (row.table_kind === 'word_limit') return false;
         const fields = row.dynamic_fields || {};
-        const source = [row.content, Object.keys(fields).join(' '), Object.keys(fields).map(function (key) { return fields[key]; }).join(' ')].join(' ');
-        return /✏️|TODO|待确认|待补充|暂无具体设计|占位|需要文案|包装|确认/i.test(source);
+        const body = buildReviewBody(row);
+        if (!body && row.block_type !== 'table_row') return false;
+        const fieldName = stripCodeTicks(getDynamicByNormalizedName(fields, ['字段名', 'field', 'key']));
+        const nameOrTitle = getDynamicByNormalizedName(fields, ['命座名称✏️', '命座名称', '命座效果✏️', '命座效果', 'heroAwakeName', 'heroAwakeDesc']);
+        const contentSource = [body, row.content, Object.keys(fields).map(function (key) { return fields[key]; }).join(' ')].join(' ');
+        const hasTodo = PROCESSING_KEYWORDS.some(function (keyword) { return new RegExp(keyword, 'i').test(contentSource); });
+        if (hasTodo || /✏️/.test(contentSource)) return true;
+        if (row.block_type === 'table_row' && isBusinessContentRow(row) && Object.keys(fields).some(function (key) { return /✏️/.test(key); })) return true;
+        if (row.table_kind === 'skill_packaging' && /^(name|title|content|tagtext|tagText|paramName)$/i.test(fieldName)) return true;
+        if (row.table_kind === 'awakening' && (nameOrTitle || /^(heroAwakeName|heroAwakeDesc)$/i.test(fieldName))) return true;
+        if (row.table_kind === 'ui_text' && (/[\u4e00-\u9fff]/.test(body) || hasTodo)) return true;
+        return false;
       }
 
       function collectDynamicColumns() {
@@ -1503,6 +1697,13 @@
 
       function getExcelCellValue(row, field, value) {
         return value;
+      }
+
+      function getOriginalCell(row, index) {
+        const raw = row && row.dynamic_fields ? row.dynamic_fields.original_cells : '';
+        if (!raw || String(raw).charAt(0) !== '[') return '';
+        const cells = JSON.parse(raw);
+        return cleanHumanText(cells[index] || '');
       }
 
       function buildSpecialSheets() {
@@ -1524,19 +1725,21 @@
       }
 
       function baseSheetRow(row) {
-        return { __rowIndex: rows.indexOf(row), '序号': row.content_id || '', '分类': row.category || '其他', '是否需处理': needsProcessing(row) ? '是' : '否', '原章节': cleanHumanText(row.section_path || '') };
+        return { __rowIndex: rows.indexOf(row), '序号': row.content_id || '', '分类': row.category || suggestCategory(row), '是否需处理': needsProcessing(row) ? '是' : '否', '原章节': cleanHumanText(row.section_path || '') };
       }
 
       function buildSkillPackagingRows() {
         return rows.filter(function (row) { return row.table_kind === 'skill_packaging'; }).map(function (row) {
-          const body = pickDynamicFieldValue(row, ['内容 / 包装要求✏️', '内容 / 包装要求', '内容 / 机制概述✏️', '内容 / 机制概述', 'content']);
+          const body = cleanBodyText(pickDynamicFieldValue(row, ['内容 / 包装要求✏️', '内容 / 机制概述✏️', '内容 / 包装要求', '内容 / 机制概述', 'normalized_content', 'content']));
+          const paragraph = pickDynamicFieldValue(row, ['段落']) || getOriginalCell(row, 0);
+          const fieldType = pickDynamicFieldValue(row, ['字段类型']) || inferSkillFieldType(paragraph, '');
           return Object.assign(baseSheetRow(row), {
-            '技能模块': cleanHumanText(row.module_name || row.nearest_heading || ''),
-            '段落': pickDynamicFieldValue(row, ['段落']),
-            '字段类型': pickDynamicFieldValue(row, ['字段类型']),
-            '字段名': pickDynamicFieldValue(row, ['字段名']),
+            '技能模块': cleanHumanText(row.h3 || row.module_name || row.nearest_heading || ''),
+            '段落': paragraph,
+            '字段类型': fieldType,
+            '字段名': stripCodeTicks(pickDynamicFieldValue(row, ['字段名'])),
             '内容 / 包装要求': body,
-            '涉及技能数据': pickDynamicFieldValue(row, ['涉及的技能数据名称✏️', '涉及的技能数据名称', '涉及技能数据']),
+            '涉及技能数据': pickDynamicFieldValue(row, ['涉及的技能数据名称✏️', '涉及的技能数据名称✏️ （用于技能养成数据描述）', '涉及的技能数据名称', '涉及技能数据']),
             '字数': countCharacters(body)
           });
         });
@@ -1555,11 +1758,12 @@
 
       function buildTerminologyRows() {
         return rows.filter(function (row) { return row.table_kind === 'terminology' || row.table_kind === 'tag_table'; }).map(function (row) {
+          const isTag = row.table_kind === 'tag_table';
           return Object.assign(baseSheetRow(row), {
-            '类型': row.table_kind === 'tag_table' ? '标签' : '术语',
-            '名称': pickDynamicFieldValue(row, ['术语✏️', '术语', '标签✏️', '标签', '属性✏️', '属性', '名称']),
+            '类型': isTag ? '标签' : '术语',
+            '名称': isTag ? pickDynamicFieldValue(row, ['标签✏️', '标签', '名称']) : pickDynamicFieldValue(row, ['术语✏️', '术语', '属性✏️', '属性', '名称']),
             '出现位置': pickDynamicFieldValue(row, ['出现位置', '位置']),
-            '机制说明 / 备注': pickDynamicFieldValue(row, ['机制说明', '说明', '备注', '描述'])
+            '机制说明 / 备注': isTag ? pickDynamicFieldValue(row, ['备注', '机制说明', '说明', '描述']) : pickDynamicFieldValue(row, ['机制说明', '备注', '说明', '描述'])
           });
         });
       }
