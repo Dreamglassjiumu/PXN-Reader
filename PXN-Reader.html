@@ -836,20 +836,17 @@
             const headers = splitMarkdownTableRow(lines[i]);
             i += 2;
             let rowIndex = 1;
-            while (i < lines.length && isTableContentLine(lines[i])) {
+            while (i < lines.length && isTableBodyLine(lines[i])) {
               const values = splitMarkdownTableRow(lines[i]);
-              const dynamicFields = {};
-              headers.forEach(function (header, cellIndex) {
-                dynamicFields[header || ('列' + (cellIndex + 1))] = values[cellIndex] == null ? '' : values[cellIndex];
-              });
+              const tableFields = normalizeMarkdownTableFields(headers, values);
               addRow({
                 block_type: 'table_row',
                 type: 'table_row',
                 table_id: tableId,
                 table_name: getCurrentTableName(),
                 row_index: rowIndex,
-                content: makeTableRowContent(headers, dynamicFields),
-                dynamic_fields: dynamicFields
+                content: makeTableRowContent(tableFields.columns, tableFields.dynamicFields),
+                dynamic_fields: tableFields.dynamicFields
               });
               rowIndex += 1;
               i += 1;
@@ -969,6 +966,12 @@
         return trimmed.indexOf('|') !== -1 && /^\|?.+\|.+\|?$/.test(trimmed);
       }
 
+      function isTableBodyLine(line) {
+        const trimmed = String(line || '').trim();
+        if (!trimmed) return false;
+        return isTableContentLine(trimmed) || /^\|/.test(trimmed);
+      }
+
       function isTableSeparatorLine(line) {
         if (!isTableContentLine(line)) return false;
         const cells = splitMarkdownTableRow(line);
@@ -980,6 +983,24 @@
         if (trimmed.charAt(0) === '|') trimmed = trimmed.slice(1);
         if (trimmed.charAt(trimmed.length - 1) === '|') trimmed = trimmed.slice(0, -1);
         return trimmed.split('|').map(function (cell) { return cell.trim(); });
+      }
+
+      function normalizeMarkdownTableFields(headers, values) {
+        const columns = headers.map(function (header, index) {
+          return header || ('列' + (index + 1));
+        });
+        const dynamicFields = {};
+        columns.forEach(function (column, cellIndex) {
+          dynamicFields[column] = values[cellIndex] == null ? '' : values[cellIndex];
+        });
+        if (values.length > columns.length) {
+          values.slice(columns.length).forEach(function (value, extraIndex) {
+            const column = 'extra_' + (extraIndex + 1);
+            columns.push(column);
+            dynamicFields[column] = value == null ? '' : value;
+          });
+        }
+        return { columns: columns, dynamicFields: dynamicFields };
       }
 
       function makeTableRowContent(headers, dynamicFields) {
@@ -1138,11 +1159,11 @@
               categoryCell.appendChild(select);
               tr.appendChild(categoryCell);
             } else {
-              appendCell(tr, row[column.field], column.field === 'content' ? 'content-cell' : '');
+              appendCell(tr, getExcelCellValue(row, column.field, row[column.field]), column.field === 'content' ? 'content-cell' : '');
             }
           });
           dynamicColumns.forEach(function (field) {
-            appendCell(tr, row.dynamic_fields ? row.dynamic_fields[field] : '', 'content-cell');
+            appendCell(tr, getExcelCellValue(row, field, row.dynamic_fields ? row.dynamic_fields[field] : ''), 'content-cell');
           });
           els.tableBody.appendChild(tr);
         });
@@ -1159,6 +1180,13 @@
           });
         });
         return columns;
+      }
+
+      function getExcelCellValue(row, field, value) {
+        if (row && row.block_type === 'table_row' && (field === 'content' || (row.dynamic_fields && Object.prototype.hasOwnProperty.call(row.dynamic_fields, field)))) {
+          return stripInlineMarkdown(value);
+        }
+        return value;
       }
 
       function appendCell(tr, value, className) {
@@ -1218,7 +1246,8 @@
         const columns = BASE_EXCEL_COLUMNS.concat(dynamicColumns.map(function (field) { return { field: field, label: field, dynamic: true }; }));
         const tableRows = [columns.map(function (column) { return column.label; })].concat(rows.map(function (row) {
           return columns.map(function (column) {
-            return column.dynamic ? ((row.dynamic_fields && row.dynamic_fields[column.field]) || '') : row[column.field];
+            const value = column.dynamic ? ((row.dynamic_fields && row.dynamic_fields[column.field]) || '') : row[column.field];
+            return getExcelCellValue(row, column.field, value);
           });
         }));
         const tableHtml = tableRows.map(function (cells, rowIndex) {
@@ -1393,6 +1422,14 @@
 
       function formatWordTableAsFields(row) {
         return '<div class="table-field-block"><p class="table-field-title">【记录 ' + escapeHtml(row.row_index || '') + '】</p><p>' + formatInlineMarkdown(row.content || '').replace(/；/g, '<br>') + '</p></div>';
+      }
+
+      function stripInlineMarkdown(value) {
+        return String(value == null ? '' : value)
+          .replace(/`([^`]+)`/g, '$1')
+          .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, '$1')
+          .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+          .replace(/__([^_\n]+)__/g, '$1');
       }
 
       function formatInlineMarkdown(value) {
