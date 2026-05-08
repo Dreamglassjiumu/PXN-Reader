@@ -248,7 +248,7 @@ storage/
 5. 在 **解析结果** 表格中检查结构化数据，并按需修改 **分类**。
 6. 根据需要点击：
    - **导出 Word**：导出可用 Word 打开的 `.doc` 文件。
-   - **导出 Excel**：导出可用 Excel 打开的 `.xls` 文件。
+   - **导出 Excel**：导出真正的 `.xlsx` 文件；XLSX 导出库已内嵌在 `PXN-Reader.html` 中，单独下载该 HTML 文件也可离线使用。
    - **复制阅读稿**：复制整理后的纯文本阅读稿。
    - **清空当前文档**：清空当前文件、文本和解析结果。
 
@@ -258,7 +258,8 @@ storage/
 - 不使用 Streamlit。
 - 不需要服务器。
 - 不引用外部 CDN、外部字体或外部图片。
-- CSS 和 JavaScript 均内置在 `PXN-Reader.html` 中。
+- CSS、通用 Markdown 解析逻辑和 XLSX 导出所需 JavaScript 均内置在 `PXN-Reader.html` 中。
+- 采用单文件内嵌版：只下载 `PXN-Reader.html` 也可以导出真正的 `.xlsx`，无需外部 CDN，也不依赖 `vendor/` 目录。
 - 可在公司内网断网环境下打开使用。
 
 ### Markdown 解析规则
